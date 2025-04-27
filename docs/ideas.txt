@@ -1,0 +1,3 @@
+- _elements durch _list ersetzen 
+- Strichdicke auf 2 px
+

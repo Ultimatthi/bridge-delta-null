@@ -1,0 +1,1156 @@
+"""
+Bridge: Client
+"""
+
+import arcade
+from arcade.future.light import Light, LightLayer
+import socket
+import threading
+import pickle
+import time
+# import win32api 
+import numpy as np
+import random
+
+
+
+# ──[ Parameters ]─────────────────────────────────────────────────────────────
+
+# Connection paramter
+HOST = '87.245.102.13'
+PORT = 55556
+
+# Set seed
+random.seed(42)
+
+# Calculate window dimensions (effective work area)
+# monitor_info = win32api.GetMonitorInfo(win32api.MonitorFromPoint((0,0)))
+# work_area = monitor_info.get("Work")
+SCREEN_WIDTH = int(1536/1.1) # int(work_area[2]/1.1)
+SCREEN_HEIGHT = int(864/1.1) #int((work_area[3] - win32api.GetSystemMetrics(4))/1.1)
+SCREEN_TITLE = 'Bridge: Cardgame'
+
+# Scale unit (to scale everything up or down from a default resolution of 1920x1080)
+SCALE = min(SCREEN_HEIGHT/1080, SCREEN_WIDTH/1920)
+CARD_SCALE = 1.2*SCALE
+
+# Board element parameters
+MARGIN_OUTER = 30*SCALE*1
+MARGIN_INNER = 30*SCALE*2
+TABLE_X = SCREEN_WIDTH/2
+TABLE_Y = SCREEN_HEIGHT*0.55
+
+PLAYER_POSITIONS = ["north", "east", "south", "west"]
+BID_TYPES = ["pass", "double", "normal"]
+
+# Cards parameters
+CARD_WIDTH = 140*CARD_SCALE
+CARD_HEIGHT = 190*CARD_SCALE
+CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
+SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
+CARD_ENLARGE = 1.2
+# STACK_ANGLES = x = [random.uniform(88.0, 92.0) for _ in range(13)]
+
+# Light
+LIGHT_RADIUS = SCREEN_WIDTH*0.9
+
+
+# ──[ Classes ]────────────────────────────────────────────────────────────────
+
+class Card(arcade.Sprite):
+    """ Card sprite """
+
+    def __init__(self, suit, value, facing, owner, location, trick, scale=1):
+        """ Card constructor """
+
+        # Attributes
+        self.suit = suit
+        self.value = value
+        self.facing = facing # up, down
+        self.owner = owner
+        self.location = location # deck, table, hand, dummy, tricks
+        self.trick = trick
+
+        # Image to use for the sprite when face up
+        self.image = f":resources:images/cards/card{self.suit}{self.value}.png"
+        
+        # Call the parent
+        super().__init__(self.image, scale, hit_box_algorithm="None")
+        
+    def face_down(self):
+        """ Turn card face-down """
+        self.texture = arcade.load_texture(":resources:images/cards/cardBack_red2.png")
+        
+    def face_down_wrapped(self):
+        """ Wraps card in band """
+        self.texture = arcade.load_texture(r'assets/images/cardBack_wrapped.png')
+        
+    def face_up(self):
+        """ Turn card face-up """
+        self.texture = arcade.load_texture(self.image)
+
+    
+
+class BoardElement(arcade.Sprite):
+    """ Sector sprite """
+
+    def __init__(self, image_path, scale):
+        """ Board element constructor """
+        
+        # Image to use for the sprite
+        self.image_file_name = image_path
+
+        # Call the parent
+        super().__init__(self.image_file_name, scale, hit_box_algorithm = 'None')
+        
+        
+
+class Player():
+    """ Player class """
+    
+    def __init__(self, name, position):
+        """ Player constructor """
+        
+        # Attributes
+        self.name = name
+        self.position = position
+        self.team = self.allocate_team(position)
+        self.bid_suit = None
+        self.bid_level = None
+        self.bid_type = None # pass, double, normal
+        self.bid_pos_x = None
+        self.bid_pos_y = None
+        
+    def allocate_team(self, position):
+        """Allocate team based on player's position"""
+        
+        team_by_player = {
+            "north": "northsouth",
+            "south": "northsouth",
+            "east": "eastwest",
+            "west": "eastwest"
+        }
+        team = team_by_player[position]
+        return(team)
+
+    def draw_bid(self):
+        """ Draw bidding text """
+        
+        suit_symbol = self.get_suit_symbol(self.bid_suit)
+        label = f"{self.value}{suit_symbol}"
+        text = arcade.Text(
+            label,
+            x=self.bid_pos_x, y=self.bid_pos_y,
+            color=arcade.color.WHITE,
+            font_size=30*SCALE, font_name="Courier New",
+            anchor_x="center", anchor_y="center", align="center"
+        )
+        text.draw()
+        
+
+        
+        
+class Button(arcade.Sprite):
+    """ Button sprite """
+    
+    def __init__(self, image_path, scale, callback=None):
+        """ Button constructor """
+        
+        # Call the parent
+        super().__init__(image_path, scale)
+        
+        # Attributes
+        self.original_scale = scale
+        self.callback = callback
+        
+    def on_click(self):
+        
+        # Shrink when clicked
+        self.scale = self.original_scale*0.9
+        arcade.schedule(self.reset_scale, 0.2)  # Nach 0.5s zurücksetzen
+        
+        # Callback aufrufen, falls vorhanden
+        if self.callback:
+            self.callback()
+            
+    def reset_scale(self, delta_time):
+        self.scale = self.original_scale
+            
+
+# ──[ Spielklasse ]────────────────────────────────────────────────────────────
+
+class Game(arcade.Window):
+    """ Main application class. """
+
+    def __init__(self):
+        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+
+        # Play mat colour
+        self.background_color = arcade.color.ARSENIC
+        
+        # Sound effects
+        self.sound_slide = arcade.load_sound(r'assets/effects/slide.mp3')
+        self.sound_cash = arcade.load_sound(r'assets/effects/cash.mp3')
+        self.sound_drop = arcade.load_sound(r'assets/effects/drop.mp3')
+        self.sound_lock = arcade.load_sound(r'assets/effects/lock.mp3')
+        
+        # Fonts
+        arcade.load_font("assets/fonts/CourierNewBold.ttf")
+        
+    def setup(self):
+        """ Set up the game here. Call this function to restart the game. """
+        
+        # Set game phase
+        self.game_phase = "playing"
+        
+        # Visibility of last trick
+        self.last_trick_visible = None
+        
+        # Mouse position
+        self.mouse_x = 0
+        self.mouse_y = 0
+        
+        # Ask for position
+        self.player_position = "north" #input("Position: ")
+        
+        # Ask for username
+        self.player_name = "lukassss" # input("Username: ")
+        
+        # Allocate team
+        self.team = self.allocate_team(self.player_position)
+        
+        # Bid
+        self.bid_suit = None
+        self.bid_level = None
+        self.bid_type = None
+        
+        # List with all the players
+        self.player_list = []
+        
+        # Sprite list with all the cards, no matter what pile they are in
+        self.card_list = arcade.SpriteList()
+        
+        # Board element list with all the board elements
+        self.board_elements = arcade.SpriteList()
+        
+        # Board element list with all the bidding elements
+        self.bidding_elements = arcade.SpriteList()
+        
+        # Button element list with all the buttons
+        self.button_elements = arcade.SpriteList()
+        
+        # Layer to handle light sources
+        self.light_layer = LightLayer(SCREEN_WIDTH, SCREEN_HEIGHT)
+        
+        # Set background of light layer
+        self.light_layer.set_background_color(self.background_color)
+        
+        # Box to indicate bidding turn
+        self.bidding_box = arcade.shape_list.ShapeElementList()
+        self.bidding_box.append(
+            arcade.shape_list.create_rectangle_outline(
+            center_x=0, center_y=0, 
+            width=77*SCALE, height=77*SCALE, color=arcade.color.WHITE, 
+            border_width=6*SCALE, tilt_angle=0)
+        )
+        
+        # Init game state
+        self.current_turn = None
+        self.current_sound = None
+        self.contract_suit = None
+        self.contract_level = None
+        self.contract_team = None
+        self.score = 0
+        self.current_game = None
+        self.total_games = None
+        
+        # Hovered card
+        self.hover_card = None
+        
+        # Thread
+        self.running = True
+
+        # Create every card
+        for card_suit in CARD_SUITS:
+            for card_value in CARD_VALUES:
+                card = Card(card_suit, card_value, "up", None, None, CARD_SCALE)
+                self.card_list.append(card)
+        
+        # Create every player
+        for position in PLAYER_POSITIONS:
+            name = str(position) + "(Bot)"
+            player = Player(name, position)
+            self.player_list.append(player)
+              
+        # Create board elements: Scoring area
+        image_path = r'assets/images/board.bidding.png'
+        self.board_bidding = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH/2
+        y = SCREEN_HEIGHT/2
+        self.board_bidding.position = x, y
+                
+        # Create board elements: Scoring area
+        image_path = r'assets/images/board.scoring.png'
+        self.board_scoring = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH - MARGIN_INNER - self.board_scoring.width/2
+        y = SCREEN_HEIGHT - MARGIN_INNER - self.board_scoring.height/2
+        self.board_scoring.position = x, y
+        
+        # Create board elements: Contract area
+        image_path = r'assets/images/board.contract.png'
+        self.board_contract = BoardElement(image_path, SCALE)
+        x = MARGIN_INNER + self.board_contract.width/2
+        y = SCREEN_HEIGHT - MARGIN_INNER - self.board_contract.height/2
+        self.board_contract.position = x, y
+        
+        # Create board elements: Trick area (won)
+        image_path = r'assets/images/board.tricks.won.png'
+        self.board_tricks_won = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH - MARGIN_INNER - self.board_tricks_won.width/2
+        y = MARGIN_INNER + self.board_tricks_won.height/2
+        self.board_tricks_won.position = x, y
+
+        # Create board elements: Trick area (lost)
+        image_path = r'assets/images/board.tricks.lost.png'
+        self.board_tricks_lost = BoardElement(image_path, SCALE)
+        x = MARGIN_INNER + self.board_tricks_lost.width/2
+        y = MARGIN_INNER + self.board_tricks_lost.height/2
+        self.board_tricks_lost.position = x, y
+        
+        # Create board element: Texture
+        image_path =  r'assets/images/board.texture.png'
+        self.board_texture = BoardElement(image_path, SCALE)
+        self.board_texture.position = SCREEN_WIDTH/2, SCREEN_HEIGHT/2
+        
+        # Add to board element list
+        self.board_elements.append(self.board_scoring)
+        self.board_elements.append(self.board_contract)
+        self.board_elements.append(self.board_tricks_won)
+        self.board_elements.append(self.board_tricks_lost)
+        self.board_elements.append(self.board_texture)
+        
+        # Add to bidding element list
+        self.bidding_elements.append(self.board_bidding)
+        
+        # Create buttons: Increase bid
+        button_up = Button("assets/images/button.up.png", SCALE, callback=self.increase_bid)
+        button_up.center_x = self.board_bidding.left + 210*SCALE
+        button_up.center_y = self.board_bidding.bottom + 160*SCALE
+        
+        # Create buttons: Decrease bid
+        button_down = Button("assets/images/button.down.png", SCALE, callback=self.decrease_bid)
+        button_down.center_x = self.board_bidding.left + 210*SCALE
+        button_down.center_y = self.board_bidding.bottom + 20*SCALE
+        
+        # Create buttons: Lock bid
+        button_lock = Button("assets/images/button.lock.png", SCALE, callback=self.lock_bid)
+        button_lock.center_x = self.board_bidding.left + 280*SCALE
+        button_lock.center_y = self.board_bidding.bottom + 70*SCALE
+        
+        # Add to button list
+        self.button_elements.append(button_up)
+        self.button_elements.append(button_down)
+        self.button_elements.append(button_lock)
+        
+        # Create main light source
+        self.center_light = Light(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                             radius=LIGHT_RADIUS,
+                             color=arcade.color.BEIGE,
+                             mode='soft')
+        
+        # Add light sources to light layer
+        self.light_layer.add(self.center_light)
+        
+        # Connect to socket
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((HOST, PORT))
+        
+        # Send player data to server
+        data = {
+            "player_position": self.player_position,
+            "player_name": self.player_name
+        }
+        self.socket.sendall(pickle.dumps(data))
+        
+        # Start thread to receive messages
+        recv_thread = threading.Thread(target=self.receive_state, daemon=True)
+        recv_thread.start()
+
+        
+        
+    def on_update(self, delta_time):
+        """Update sprites. """
+        
+        # Shrink previous enlarged card
+        for card in self.card_list:
+            if card != self.hover_card and card.scale != CARD_SCALE:
+                card.scale = CARD_SCALE
+            elif card.location != "hand" and card.scale != CARD_SCALE:
+                card.scale = CARD_SCALE
+        
+        # Enlarge card we are hovering above
+        if (self.hover_card != None):
+            if self.hover_card.location == "hand":
+                self.hover_card.scale = CARD_ENLARGE*CARD_SCALE
+                
+        # Adjust card facing
+        for card in self.card_list:
+            if card.facing == "down":
+                card.face_down()
+            elif card.facing == "wrapped":
+                card.face_down_wrapped()
+            else:
+                card.face_up()
+                
+        
+                
+    def on_draw(self):
+        """ Render the screen. """
+        
+        # Clear the screen
+        self.clear()
+        
+        with self.light_layer:
+            
+            # Draw board elements
+            self.board_elements.draw()
+            
+            # Draw bidding elemnts
+            if self.game_phase == "bidding":
+                
+                # Draw bidding field
+                self.bidding_elements.draw()
+                
+                # Draw bidding turn indicator
+                self.bidding_box.draw()
+
+                # Draw buttons
+                self.button_elements.draw()
+                
+                # Annotations
+                self.annotate_bidding()
+            
+            # Draw playfield border
+            arcade.draw_lrbt_rectangle_outline(
+                left=MARGIN_OUTER,
+                right=SCREEN_WIDTH - MARGIN_OUTER,
+                bottom=MARGIN_OUTER,
+                top=SCREEN_HEIGHT - MARGIN_OUTER,
+                color=arcade.color.WHITE,
+                border_width=2*SCALE
+            )
+            
+            # Color cards
+            self.color_cards()
+            
+            # Draw the cards
+            self.card_list.draw()
+            
+            # Annotations
+            self.annotate()
+            
+            # Card review
+            self.card_review()
+            
+        self.light_layer.draw()
+        
+
+
+    def card_review(self):
+
+        if self.last_trick_visible:
+        
+            # Text object
+            text = arcade.Text(
+                "last_trick_info_placeholder",
+                x=self.mouse_x, y=self.mouse_y+30*SCALE,
+                color=arcade.color.WHITE,
+                font_size=22.5*SCALE, font_name="Courier New",
+                anchor_x="center", anchor_y="center",
+                align="center", rotation=0
+            )
+            text.draw()
+        
+        
+    def pull_to_top(self, card: arcade.Sprite):
+        """ Pull card to top of rendering order (last to render, looks on-top) """
+
+        # Remove, and append to the end
+        self.card_list.remove(card)
+        self.card_list.append(card)
+
+    def on_mouse_press(self, x, y, button, key_modifiers):
+        """ Called when the user presses a mouse button. """
+
+        # Get list of cards we've clicked on
+        cards = arcade.get_sprites_at_point((x, y), self.card_list)
+
+        # Have we clicked on a card?
+        if len(cards) > 0:
+
+            # Might be a stack of cards, get the top one
+            held_card = cards[-1]
+            
+            # Play card
+            if held_card.location == "hand":
+                self.play_card(held_card)
+            
+            # Take trick
+            if held_card.location == "table":
+                self.take_trick()
+                
+        # Execute clicked buttons
+        buttons = arcade.get_sprites_at_point((x, y), self.button_elements)
+        for button_sprite in buttons:
+            button_sprite.on_click()
+                
+    def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
+        """ Called when the user scrolls the mouse wheel. """
+        
+        if scroll_y > 0:
+            self.increase_bid()
+        elif scroll_y < 0:
+            self.decrease_bid()
+
+
+    def increase_bid(self):
+        """ Increases bid by one unit """
+        
+        # Already at max level
+        if self.bid_level == 7 and self.bid_suit == "notrump":
+            return
+        
+        # Play sound
+        self.play_sound("bid")
+        
+        # Get ordinal (strictly increasing) number of bid and current highest bid (contract)
+        bid_ordinal = self.get_bid_ordinal(self.bid_level, self.bid_suit)
+        contract_ordinal = self.get_bid_ordinal(self.contract_level, self.contract_suit)
+        
+        # First bid in a game
+        if self.contract_level is None:
+            self.bid_level = 0
+            self.bid_suit = "notrump"
+            self.bid_type = "pass"
+            return
+            
+        # First bid in a player's turn
+        if bid_ordinal < contract_ordinal:
+            self.bid_level = self.contract_level
+            self.bid_suit = self.contract_suit
+            self.bid_type = "pass"
+            return
+        
+        # Navigate throuth bid types
+        if self.bid_type != "normal":
+            index = BID_TYPES.index(self.bid_type)
+            self.bid_type = BID_TYPES[index + 1]
+        
+        # Increase bid if bid type is normal
+        if self.bid_type == "normal":
+            index = (SUITS.index(self.bid_suit) + 1) % 5
+            self.bid_level += (index==0)
+            self.bid_suit = SUITS[index]
+        
+            
+
+    def decrease_bid(self):
+        """ Decreases bid by one unit """
+        
+        # Player first must increase bid
+        if self.bid_level is None:
+            return
+        
+        # Cannot go below pass
+        if self.bid_type == "pass":
+            return
+        
+        # Play sound
+        self.play_sound("bid")
+        
+        # Get ordinal (strictly increasing) number of bid and current highest bid (contract)
+        bid_ordinal = self.get_bid_ordinal(self.bid_level, self.bid_suit)
+        contract_ordinal = self.get_bid_ordinal(self.contract_level, self.contract_suit)
+        
+        # Decrease bid if type is normal
+        if self.bid_type == "normal":
+            index = (SUITS.index(self.bid_suit) - 1) % 5
+            self.bid_level -= (index==4)
+            self.bid_suit = SUITS[index]
+
+        # Navigate through bid types
+        if self.bid_level == 0 or bid_ordinal-1 <= contract_ordinal:
+            index = BID_TYPES.index(self.bid_type)
+            self.bid_type = BID_TYPES[index -1]
+
+        
+
+    def lock_bid(self):
+        
+        # Create action for server
+        action = {
+            "type": "lock_bid",
+            "bid_level": self.bid_level,
+            "bid_suit": self.bid_suit
+        }
+        
+        # Send action to server
+        try:
+            self.socket.sendall(pickle.dumps(action))
+        except Exception as e:
+            print(f"Error sending to server: {e}")
+        
+        # Play sound
+        self.play_sound("lock")
+        
+        
+    def get_bid_ordinal(self, bid_level, bid_suit):
+        """ Calculate stricly increasing value of a bid """
+        
+        if bid_level is None:
+            ordinal = -1
+        else:
+            ordinal = SUITS.index(bid_suit) + (bid_level-1)*5
+       
+        return(ordinal)
+        
+        
+        
+        
+    def on_mouse_motion(self, x: float, y: float, dx: float, dy: float):
+        """ User moves mouse """
+        
+        # Update mouse position
+        self.mouse_x = x
+        self.mouse_y = y
+        
+        # Get cards on table
+        table = [card for card in self.card_list if card.location == "table"]
+        
+        # Get cards on trick pile
+        tricks = [card for card in self.card_list if card.location == "tricks"]
+        
+        # Get list of cards we'are hovering above
+        cards = arcade.get_sprites_at_point((x, y), self.card_list)
+        
+        # Declare top card as hovered card
+        if len(cards) > 0:
+            self.hover_card = cards[-1]
+        else:
+            self.hover_card = None
+            
+        # Get list of buttons we'are hovering above
+        buttons = arcade.get_sprites_at_point((x, y), self.button_elements)
+        
+        # Set cursor type to default
+        cursor_type = self.CURSOR_DEFAULT
+        
+        # Set cursor type to "hand" if hovering above button
+        if buttons:
+            cursor_type = self.CURSOR_HAND
+                
+        # Set cursor type to "hand" if hovering card above hand card
+        if len(cards) > 0:
+            if cards[-1].location == "hand" and cards[-1].owner == self.player_position:
+                cursor_type = self.CURSOR_HAND
+                
+        # Set cursor type to "hand" if hovering card above trick ready to take
+        if len(cards) > 0:
+            if len(table) == 4 and cards[-1].location == "table":
+                cursor_type = self.CURSOR_HAND
+                
+        # Set cursor type to "cross" if hovering over a card of the last trick taken
+        self.last_trick_visible = False  
+        if len(cards) > 0 and len(tricks) > 0:
+            if cards[-1] == tricks[-1]:
+                cursor_type = self.CURSOR_CROSSHAIR
+                self.last_trick_visible = True
+               
+        # Set cursor
+        self.set_mouse_cursor(self.get_system_mouse_cursor(cursor_type))
+                
+        
+    def on_key_press(self, key, _modifiers):
+        """ Handle keypresses. """
+        
+        # Leave game
+        if key == arcade.key.ESCAPE:
+            
+            # Set running to False to stop thread
+            self.running = False
+            
+            # Send action to server
+            action = {"type": "leave_game"}
+            
+            # Disconnect
+            try:
+                self.socket.sendall(pickle.dumps(action))
+                self.socket.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
+            finally:
+                self.socket.close()
+                
+            # Close program
+            arcade.close_window()
+            
+            
+            
+    def play_card(self, card):
+        """Send play card action to server"""
+
+        # Create action for server
+        action = {
+            "type": "play_card",
+            "card_suit": card.suit,
+            "card_value": card.value
+        }
+        
+        # Send action to server
+        try:
+            self.socket.sendall(pickle.dumps(action))
+        except Exception as e:
+            print(f"Error sending to server: {e}")
+            
+            
+            
+    def take_trick(self):
+        """Send take trick action to server"""
+            
+        # Create action for server
+        action = {"type": "take_trick"}
+        
+        # Send action to server
+        try:
+            self.socket.sendall(pickle.dumps(action))
+        except Exception as e:
+            print(f"Fehler beim Serialisieren der Aktion: {e}")
+            
+            
+    
+        
+        
+
+    def order_hand(self):
+        """Order cards in hand by suit and value"""
+        
+        self.card_list.sort(key=lambda card: (CARD_SUITS.index(card.suit), CARD_VALUES.index(card.value)))
+
+
+    def receive_state(self):
+        """Receive game state from server"""
+        
+        while self.running:
+            try:
+                data = self.socket.recv(4096)
+                self.update_state(data)
+            except socket.error as e:
+                print(f"Network error: {e}")
+                time.sleep(0.1)
+                continue
+                
+            
+    def update_state(self, data):
+        """Update game state from server data"""
+        
+        # Load game state
+        game_state = pickle.loads(data)
+        
+        # Update game state variables
+        self.game_phase = game_state.get("game_phase")
+        self.current_turn = game_state.get("current_turn")
+        self.contract_suit = game_state.get("contract_suit")
+        self.contract_level = game_state.get("contract_level")
+        self.contract_team = game_state.get("contract_team")
+        self.score = game_state.get("score")
+        self.current_game = game_state.get("current_game")
+        self.total_games = game_state.get("total_games")
+        
+        # Play sound
+        sound = game_state.get("sound")
+        self.play_sound(sound)
+        
+        # Get player info
+        logical_player_list = game_state.get("players")
+        
+        # Setup map for fast access
+        player_map = {player.position: player for player in self.player_list}
+        
+        # Update player variables
+        for logical_player in logical_player_list:
+            position = logical_player["position"]
+            if position in player_map:
+                player = player_map[position]
+                player.name = logical_player["name"]
+                player.team = logical_player["team"]
+                player.bid_suit = logical_player["bid_suit"]
+                player.bid_level = logical_player["bid_level"]
+            
+        # Get logical card variables
+        logical_card_list = game_state.get("cards")
+        
+        # Setup map for fast access
+        card_map = {(card.suit, card.value): card for card in self.card_list}
+        
+        # Update card variables
+        for logical_card in logical_card_list:
+            key = (logical_card["suit"], logical_card["value"])
+            if key in card_map:
+                card = card_map[key]
+                card.facing = logical_card["facing"]
+                card.owner = logical_card["owner"]
+                card.location = logical_card["location"]
+                card.trick = logical_card["trick"]
+        
+        # Update card position
+        self.adjust_card_position()
+        
+        # Reorder cards after new draw
+        hand_count = sum(1 for card in self.card_list if card.location == "hand")
+        if hand_count == 52:
+            self.order_hand()
+        
+        
+    def play_sound(self, sound):
+        
+        if sound == 'play_card':
+            arcade.play_sound(self.sound_slide)
+        elif sound == 'take_trick':
+            arcade.play_sound(self.sound_cash)
+        elif sound == 'bid':
+            arcade.play_sound(self.sound_drop)
+        elif sound == 'lock':
+            arcade.play_sound(self.sound_lock)
+        
+        
+    def adjust_card_position(self):
+        """Position the card based on location"""
+        
+        # Order cards in player's hand
+        for position in ("south", "north", "west", "east"):
+            # Get cards of that hand
+            hand = [
+                card for card in self.card_list 
+                if card.owner == position and card.location == "hand"
+            ]
+            
+            # Check if there are any cards in the hand
+            n = len(hand)
+            if n == 0:
+                continue
+            
+            # Get relative board position of that player (relative to this player)
+            rel_position = self.get_display_position(self.player_position, position)
+    
+            # Offset
+            max_cards = 13
+            offset = (max_cards - n) / 2
+    
+            for i, card in enumerate(hand):
+                
+                # Index as if card would be in full hand
+                virtual_i = i + offset
+                t = (virtual_i - (max_cards - 1) / 2)
+    
+                # Find position and angle
+                if rel_position == "bottom":
+                    x = SCREEN_WIDTH / 2 + t * 60 * SCALE
+                    y = CARD_HEIGHT / 2 - abs(t) ** 2 * 2.25 * SCALE
+                    angle = t / max_cards * 60  
+                elif rel_position == "top":
+                    x = SCREEN_WIDTH/2 + t * 40 * SCALE
+                    y = SCREEN_HEIGHT - CARD_HEIGHT/8 + abs(t) ** 2 * 3 * SCALE
+                    angle = -t / max_cards * 80
+                elif rel_position == "left":
+                    x = CARD_HEIGHT/8 - abs(t) ** 2 * 3 * SCALE
+                    y = SCREEN_HEIGHT/2 + t * 40 * SCALE
+                    angle = (-t / max_cards * 80) - 90
+                elif rel_position == "right":
+                    x = SCREEN_WIDTH - CARD_HEIGHT/8 + abs(t) ** 2 * 3 * SCALE
+                    y = SCREEN_HEIGHT/2 + t * 40 * SCALE
+                    angle = (t / max_cards * 80) + 90
+    
+                # Set position and angle
+                card.position = (x, y)
+                card.angle = angle
+                
+                # Set facing and size
+                if self.player_position != card.owner:
+                    card.facing = "down"
+                else:
+                    card.facing = "up"
+            
+        # Order cards on table [horizontally]
+        table = [
+            card for card in self.card_list 
+                 if card.location == "table"
+        ]
+        for card in table:
+            # Get relative board position of that owner (relative to this player)
+            rel_owner = self.get_display_position(self.player_position, card.owner)
+            if rel_owner == 'bottom':
+                card.position = TABLE_X, TABLE_Y - CARD_HEIGHT*0.6
+                card.angle = 7
+            elif rel_owner == 'left':
+                card.position = TABLE_X - CARD_WIDTH*0.6, TABLE_Y
+                card.angle = -30
+            elif rel_owner == 'top':
+                card.position = TABLE_X, TABLE_Y + CARD_HEIGHT*0.6
+                card.angle = -5
+            else:
+                card.position = TABLE_X + CARD_WIDTH*0.6, TABLE_Y
+                card.angle = 40
+                
+        # Order cards on table [vertically]
+        current_index = PLAYER_POSITIONS.index(self.current_turn)
+        # Sort by player position
+        sorted_positions = PLAYER_POSITIONS[current_index:] + PLAYER_POSITIONS[:current_index]
+        sort_order = {pos: i for i, pos in enumerate(sorted_positions)}
+        table.sort(key=lambda card: sort_order.get(card.owner, 999)) 
+        # Order cards
+        for card in table:
+            self.card_list.remove(card)
+            self.card_list.append(card)
+            
+        # Order cards on stack
+        stack_team = [
+            card for card in self.card_list 
+            if card.location == "tricks" 
+            and card.trick == self.team
+        ]
+        stack_opponent = [
+            card for card in self.card_list 
+            if card.location == "tricks" 
+            and card.trick != self.team
+        ]
+        sets = [(stack_team, self.board_tricks_won), (stack_opponent, self.board_tricks_lost)]
+        for stack, board in sets:
+            for i, card in enumerate(stack):
+                card.angle = 90 # STACK_ANGLES[int(np.floor(i/4))]
+                batch = int(np.floor(i/4))
+                if len(stack) <= 20:
+                    x = board.left + CARD_HEIGHT/2  + 30*SCALE + batch*17.5*SCALE
+                else:
+                    if i < 24:
+                        x = board.left + CARD_HEIGHT/2 + 30*SCALE
+                        card.facing = "wrapped"
+                    else:
+                        x = board.left + CARD_HEIGHT/2 + 30*SCALE + batch*17.5*SCALE
+                y = board.bottom + CARD_WIDTH/2 + 30*SCALE
+                card.position = x, y
+                
+    def color_cards(self):
+        """Color all cards that are trump"""
+        
+        for card in self.card_list:
+            if card.suit == self.contract_suit and card.facing == "up":
+                card.color = arcade.color.ANTIQUE_WHITE
+            else:
+                card.color = arcade.color.WHITE
+                
+                
+            
+    def annotate(self):
+        
+        # Player names
+        for player in self.player_list:
+            
+            # Get relative board position
+            rel_position = self.get_display_position(self.player_position, player.position)
+            
+            # Define annotation position
+            if rel_position == 'bottom':
+                x, y, a = SCREEN_WIDTH/2, CARD_HEIGHT/8*9, 0
+            elif rel_position == 'left':
+                x, y, a = CARD_HEIGHT/4*3, SCREEN_HEIGHT/2, -90
+            elif rel_position == 'top':
+                x, y, a = SCREEN_WIDTH/2, SCREEN_HEIGHT - CARD_HEIGHT/4*3, 0
+            else:
+                x, y, a = SCREEN_WIDTH - CARD_HEIGHT/4*3, SCREEN_HEIGHT/2, 90
+            
+            # Write player name
+            text = arcade.Text(
+                player.name.upper(),
+                x=x, y=y,
+                color=arcade.color.WHITE,
+                font_size=22.5*SCALE, font_name="Courier New",
+                anchor_x="center", anchor_y="center",
+                align="center", rotation=a
+            )
+            text.draw()
+            
+        # Scoring: Current game
+        x = self.board_scoring.left + 420*SCALE
+        y = self.board_scoring.bottom + 75*SCALE
+        text = self.annotate_text("16", x, y, 0, 22.5)
+        text.draw()
+        
+        # Scoring: Total games
+        x = self.board_scoring.left + 300*SCALE
+        y = self.board_scoring.bottom + 75*SCALE
+        text = self.annotate_text(self.current_game, x, y, 0, 22.5)
+        text.draw()
+        
+        # Scoring: Points
+        x = self.board_scoring.left + 360*SCALE
+        y = self.board_scoring.bottom + 165*SCALE
+        score = self.score * {"northsouth": 1, "eastwest": -1}[self.team]
+        text = self.annotate_text(score, x, y, 0, 22.5)
+        text.draw()
+
+        # Contract: Trump suit
+        x = self.board_contract.left + 420*SCALE
+        y = self.board_contract.bottom + 75*SCALE
+        suit = self.get_suit_symbol(self.contract_suit)
+        text = self.annotate_text(suit, x, y, 0, 30)
+        text.draw()
+        
+        # Contract: Level
+        x = self.board_contract.left + 300*SCALE
+        y = self.board_contract.bottom + 75*SCALE
+        text = self.annotate_text(self.contract_level, x, y, 0, 22.5)
+        text.draw()
+        
+        # Contract: Team
+        x = self.board_contract.left + 360*SCALE
+        y = self.board_contract.bottom + 165*SCALE
+        text = self.annotate_text(self.contract_team, x, y, 0, 20)
+        text.draw()
+        
+    def annotate_bidding(self):
+        
+        # Own Bid
+        for player in self.player_list:
+            if player.position != self.current_turn:
+                continue
+            x = self.board_bidding.left + 210*SCALE
+            y = self.board_bidding.bottom + 90*SCALE
+            suit = self.get_suit_symbol(self.bid_suit)
+            text = self.annotate_bid_text(self.bid_level, self.bid_suit, self.bid_type, x, y, 0, 30)
+            text.draw()
+            
+        # Bidding box (indicating bidding turn)
+        if self.current_turn == "north":
+            x = self.board_bidding.left + 210*SCALE
+            y = self.board_bidding.bottom + 410*SCALE
+            self.bidding_box.position = (x, y)
+        if self.current_turn == "east":
+            x = self.board_bidding.left + 370*SCALE
+            y = self.board_bidding.bottom + 250*SCALE
+            self.bidding_box.position = (x, y)
+        if self.current_turn == "south":
+            x = self.board_bidding.left + 210*SCALE
+            y = self.board_bidding.bottom + 90*SCALE
+            self.bidding_box.position = (x, y)
+        if self.current_turn == "west":
+            x = self.board_bidding.left + 50*SCALE
+            y = self.board_bidding.bottom + 250*SCALE
+            self.bidding_box.position = (x, y)
+            
+            
+    def annotate_bid_text(self, bid_level, bid_suit, bid_type, x, y, angle, size):
+        
+        # Transform bid to string
+        if bid_type is None:
+            label = ""
+        elif bid_type == "pass":
+            label = "P"
+        elif bid_type == "double":
+            label = "X"
+        else:
+            suit_symbol = self.get_suit_symbol(bid_suit)
+            label = f"{bid_level}{suit_symbol}"
+            
+        # Reduce size of NT bid
+        if bid_suit == "notrump":
+            size = size*0.8
+            
+        # Text object
+        text = self.annotate_text(label, x, y, angle, size)
+        
+        # Return
+        return(text)
+        
+      
+    def annotate_text(self, label, x, y, angle, size):
+        
+        # Set to "" if None
+        label = "" if label is None else label
+        
+        # Transform to string
+        label = str(label)
+        
+        # Text object
+        text = arcade.Text(
+            label.upper(),
+            x=x, y=y,
+            color=arcade.color.WHITE,
+            font_size=size*SCALE, font_name="Courier New",
+            anchor_x="center", anchor_y="center",
+            align="center", rotation=angle
+        )
+        
+        # Return
+        return(text)
+            
+            
+    def allocate_team(self, position):
+        """Allocate team based on player's position"""
+        
+        team_by_player = {
+            "north": "northsouth",
+            "south": "northsouth",
+            "east": "eastwest",
+            "west": "eastwest"
+        }
+        
+        team = team_by_player[position]
+        
+        return(team)
+        
+        
+        
+    def get_display_position(self, bottom_position, position):
+        """Finds board position for display purposes"""
+    
+        player_positions = ["north", "east", "south", "west"]
+        display_positions = ["bottom", "left", "top", "right"]
+    
+        bottom_index = player_positions.index(bottom_position)
+        position_index = player_positions.index(position)
+        distance = (position_index - bottom_index) % 4
+    
+        return display_positions[distance]
+    
+    
+    
+    def get_suit_symbol(self, suit):
+        """ Returns suit symbol """
+        
+        # Dictionary
+        dictionary = {
+            "clubs": "♣",
+            "diamonds": "♦", 
+            "hearts": "♥",
+            "spades": "♠",
+            "notrump": "NT",
+            None: ""
+        }
+        
+        symbol = dictionary[suit]
+        return(symbol)
+        
+        
+
+# ──[ Main ]───────────────────────────────────────────────────────────────────
+
+def main():
+    """ Main function """
+    window = Game()
+    window.setup()
+    arcade.run()
+
+
+if __name__ == "__main__":
+    main()

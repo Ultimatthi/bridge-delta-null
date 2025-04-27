@@ -26,8 +26,8 @@ random.seed(42)
 # Calculate window dimensions (effective work area)
 # monitor_info = win32api.GetMonitorInfo(win32api.MonitorFromPoint((0,0)))
 # work_area = monitor_info.get("Work")
-SCREEN_WIDTH = int(1536/1.1) # int(work_area[2]/1.1)
-SCREEN_HEIGHT = int(864/1.1) #int((work_area[3] - win32api.GetSystemMetrics(4))/1.1)
+SCREEN_WIDTH = int(1536) # int(work_area[2]/1.1)
+SCREEN_HEIGHT = int(864) #int((work_area[3] - win32api.GetSystemMetrics(4))/1.1)
 SCREEN_TITLE = 'Bridge: Cardgame'
 
 # Scale unit (to scale everything up or down from a default resolution of 1920x1080)

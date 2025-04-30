@@ -212,10 +212,10 @@ class Game(arcade.Window):
         self.mouse_y = 0
         
         # Ask for position
-        self.player_position = "north" #input("Position: ")
+        self.player_position = input("Position: ")
         
         # Ask for username
-        self.player_name = "lukassss" # input("Username: ")
+        self.player_name = input("Username: ")
         
         # Allocate team
         self.team = self.allocate_team(self.player_position)
@@ -728,9 +728,6 @@ class Game(arcade.Window):
             print(f"Fehler beim Serialisieren der Aktion: {e}")
             
             
-    
-        
-        
 
     def order_hand(self):
         """Order cards in hand by suit and value"""

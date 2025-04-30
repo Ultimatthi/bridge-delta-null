@@ -83,7 +83,7 @@ class GameServer:
     def __init__(self):
         self.game_phase = "playing"
         self.client_list = []
-        self.current_turn = "south"
+        self.current_turn = "north"
         self.current_sound = None
         self.contract_suit = "diamonds"
         self.contract_level = 2
@@ -556,15 +556,15 @@ class GameServer:
                 game_state["cards"].append(card_info)
                 
             # Add player info
-            for client in self.client_list:
-                client_info = {
-                    "name": client.name,
-                    "position": client.position,
-                    "team": client.team,
-                    "bid_suit": client.bid_suit,
-                    "bid_level": client.bid_level
+            for player in self.client_list:
+                player_info = {
+                    "name": player.name,
+                    "position": player.position,
+                    "team": player.team,
+                    "bid_suit": player.bid_suit,
+                    "bid_level": player.bid_level
                 }
-                game_state["players"].append(client_info)
+                game_state["players"].append(player_info)
             
             # Send game state to client
             try:

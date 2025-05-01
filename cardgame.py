@@ -56,6 +56,8 @@ CARD_ENLARGE = 1.2
 LIGHT_RADIUS = SCREEN_WIDTH*0.9
 
 
+
+
 # ──[ Classes ]────────────────────────────────────────────────────────────────
 
 class Card(arcade.Sprite):
@@ -119,8 +121,6 @@ class Player():
         self.bid_suit = None
         self.bid_level = None
         self.bid_type = None # pass, double, normal
-        self.bid_pos_x = None
-        self.bid_pos_y = None
         
     def allocate_team(self, position):
         """Allocate team based on player's position"""
@@ -133,21 +133,6 @@ class Player():
         }
         team = team_by_player[position]
         return(team)
-
-    def draw_bid(self):
-        """ Draw bidding text """
-        
-        suit_symbol = self.get_suit_symbol(self.bid_suit)
-        label = f"{self.value}{suit_symbol}"
-        text = arcade.Text(
-            label,
-            x=self.bid_pos_x, y=self.bid_pos_y,
-            color=arcade.color.WHITE,
-            font_size=30*SCALE, font_name="Courier New",
-            anchor_x="center", anchor_y="center", align="center"
-        )
-        text.draw()
-        
 
         
         
@@ -202,7 +187,7 @@ class Game(arcade.Window):
         """ Set up the game here. Call this function to restart the game. """
         
         # Set game phase
-        self.game_phase = "playing"
+        self.game_phase = "bidding"
         
         # Visibility of last trick
         self.last_trick_visible = None
@@ -211,11 +196,17 @@ class Game(arcade.Window):
         self.mouse_x = 0
         self.mouse_y = 0
         
+        # Dictiionary: Bidding text position
+        position = ["top", "right", "bottom", "left"]
+        x = np.array([210, 370, 210, 50])*SCALE
+        y = np.array([410, 250, 90, 250])*SCALE
+        self.dict_bidding_position = {pos: (x[i], y[i]) for i, pos in enumerate(position)}
+        
         # Ask for position
-        self.player_position = input("Position: ")
+        self.player_position = "north" #input("Position: ")
         
         # Ask for username
-        self.player_name = input("Username: ")
+        self.player_name = "matt" #input("Username: ")
         
         # Allocate team
         self.team = self.allocate_team(self.player_position)
@@ -517,6 +508,10 @@ class Game(arcade.Window):
     def increase_bid(self):
         """ Increases bid by one unit """
         
+        # Check if it's this player's turn
+        if self.player_position != self.current_turn:
+            return
+        
         # Already at max level
         if self.bid_level == 7 and self.bid_suit == "notrump":
             return
@@ -529,7 +524,7 @@ class Game(arcade.Window):
         contract_ordinal = self.get_bid_ordinal(self.contract_level, self.contract_suit)
         
         # First bid in a game
-        if self.contract_level is None:
+        if self.bid_type is None:
             self.bid_level = 0
             self.bid_suit = "notrump"
             self.bid_type = "pass"
@@ -557,6 +552,10 @@ class Game(arcade.Window):
 
     def decrease_bid(self):
         """ Decreases bid by one unit """
+        
+        # Check if it's this player's turn
+        if self.player_position != self.current_turn:
+            return
         
         # Player first must increase bid
         if self.bid_level is None:
@@ -592,7 +591,8 @@ class Game(arcade.Window):
         action = {
             "type": "lock_bid",
             "bid_level": self.bid_level,
-            "bid_suit": self.bid_suit
+            "bid_suit": self.bid_suit,
+            "bid_type": self.bid_type
         }
         
         # Send action to server
@@ -768,21 +768,36 @@ class Game(arcade.Window):
         sound = game_state.get("sound")
         self.play_sound(sound)
         
-        # Get player info
-        logical_player_list = game_state.get("players")
+        # Get player/bot  info
+        client_list = game_state.get("clients")
+        bot_list = game_state.get("bots")
         
         # Setup map for fast access
         player_map = {player.position: player for player in self.player_list}
         
-        # Update player variables
-        for logical_player in logical_player_list:
-            position = logical_player["position"]
-            if position in player_map:
-                player = player_map[position]
-                player.name = logical_player["name"]
-                player.team = logical_player["team"]
-                player.bid_suit = logical_player["bid_suit"]
-                player.bid_level = logical_player["bid_level"]
+        # Update player variables with clients
+        for client in client_list:
+            # Get player
+            position = client["position"]
+            player = player_map[position]
+            # Fill in attributes
+            player.name = client["name"]
+            player.team = client["team"]
+            player.bid_suit = client["bid_suit"]
+            player.bid_level = client["bid_level"]
+            player.bid_type = client["bid_type"]
+                
+        # Update player variables with bots
+        for bot in bot_list:
+            # Get player
+            position = bot["position"]
+            player = player_map[position]
+            # Fill in attributes
+            player.name = bot["name"]
+            player.team = bot["team"]
+            player.bid_suit = bot["bid_suit"]
+            player.bid_level = bot["bid_level"]
+            player.bid_type = bot["bid_type"]
             
         # Get logical card variables
         logical_card_list = game_state.get("cards")
@@ -807,8 +822,9 @@ class Game(arcade.Window):
         hand_count = sum(1 for card in self.card_list if card.location == "hand")
         if hand_count == 52:
             self.order_hand()
-        
-        
+
+
+
     def play_sound(self, sound):
         
         if sound == 'play_card':
@@ -1015,36 +1031,34 @@ class Game(arcade.Window):
         text = self.annotate_text(self.contract_team, x, y, 0, 20)
         text.draw()
         
+        
+        
     def annotate_bidding(self):
         
-        # Own Bid
+        # Sync client data with player_list data
+        player = next(player for player in self.player_list 
+                    if player.position == self.player_position)
+        player.bid_level = self.bid_level
+        player.bid_suit = self.bid_suit
+        player.bid_type = self.bid_type
+        
+        # Bidding text
         for player in self.player_list:
-            if player.position != self.current_turn:
-                continue
-            x = self.board_bidding.left + 210*SCALE
-            y = self.board_bidding.bottom + 90*SCALE
-            suit = self.get_suit_symbol(self.bid_suit)
-            text = self.annotate_bid_text(self.bid_level, self.bid_suit, self.bid_type, x, y, 0, 30)
+            # Get relative board position
+            rel_position = self.get_display_position(self.player_position, player.position)
+            # Set bidding location
+            x_rel, y_rel = self.dict_bidding_position[rel_position]
+            x = self.board_bidding.left + x_rel
+            y = self.board_bidding.bottom + y_rel
+            # Draw bidding text
+            text = self.annotate_bid_text(player.bid_level, player.bid_suit,
+                                          player.bid_type, x, y, 0, 30)
             text.draw()
-            
-        # Bidding box (indicating bidding turn)
-        if self.current_turn == "north":
-            x = self.board_bidding.left + 210*SCALE
-            y = self.board_bidding.bottom + 410*SCALE
-            self.bidding_box.position = (x, y)
-        if self.current_turn == "east":
-            x = self.board_bidding.left + 370*SCALE
-            y = self.board_bidding.bottom + 250*SCALE
-            self.bidding_box.position = (x, y)
-        if self.current_turn == "south":
-            x = self.board_bidding.left + 210*SCALE
-            y = self.board_bidding.bottom + 90*SCALE
-            self.bidding_box.position = (x, y)
-        if self.current_turn == "west":
-            x = self.board_bidding.left + 50*SCALE
-            y = self.board_bidding.bottom + 250*SCALE
-            self.bidding_box.position = (x, y)
-            
+            # Set bidding box
+            if player.position == self.current_turn:
+                self.bidding_box.position = (x, y)
+        
+
             
     def annotate_bid_text(self, bid_level, bid_suit, bid_type, x, y, angle, size):
         
@@ -1060,7 +1074,7 @@ class Game(arcade.Window):
             label = f"{bid_level}{suit_symbol}"
             
         # Reduce size of NT bid
-        if bid_suit == "notrump":
+        if bid_suit == "notrump" and bid_type == "normal":
             size = size*0.8
             
         # Text object

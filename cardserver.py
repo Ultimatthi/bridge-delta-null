@@ -17,10 +17,13 @@ CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 
 # Notwenidge Spielerzahl
-FULL_TABLE = 2
+FULL_TABLE = 1
 
 # Player positions
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
+
+# Biddable suits
+SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 
 # Logic parameters
 IDLE_TIME_PLAY = 0.5
@@ -81,12 +84,13 @@ class Client:
 class GameServer:
     
     def __init__(self):
-        self.game_phase = "playing"
+        self.game_phase = "bidding"
         self.client_list = []
+        self.bot_list = []
         self.current_turn = "north"
         self.current_sound = None
-        self.contract_suit = "diamonds"
-        self.contract_level = 2
+        self.contract_suit = None
+        self.contract_level = None
         self.contract_team = None
         self.score = 0 # Positive: Northsouth, negative: Eastwest
         self.current_game = 0
@@ -95,6 +99,10 @@ class GameServer:
         # Sprite list with all the cards
         self.card_list = []
         
+        # Bidding history
+        self.bidding_history = []
+        
+
 
     def start_server(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -112,6 +120,12 @@ class GameServer:
                 card = ServerCard(card_suit, card_value)
                 self.card_list.append(card)
                 
+        # Create every player
+        for position in PLAYER_POSITIONS:
+            name = str(position) + "(Bot)"
+            bot = Client(None, name, position)
+            self.bot_list.append(bot)
+                
         # Deal cards
         self.deal_cards()
         
@@ -128,9 +142,14 @@ class GameServer:
                     player_name = player_data.get("player_name")
                     print(f"Connection accepted from {addr} with username {player_name}")
                     
-                    # Füge zu Socket-Liste hinzu
+                    # Add to client list
                     client = Client(c, player_name, player_position)
                     self.client_list.append(client)
+                    
+                    # Remove from bot list
+                    for bot in self.bot_list:
+                        if bot.position == client.position:
+                            self.bot_list.remove(bot)
                     
                     # Set sound to none
                     self.current_sound = None
@@ -185,7 +204,7 @@ class GameServer:
         # Start respective game logic
         if self.game_phase == "dealing":
             self.deal_cards()
-            self.game_phase = "playing"
+            self.game_phase = "bidding"
         
         if self.game_phase == "bidding":
             self.bidding_logic()
@@ -194,9 +213,40 @@ class GameServer:
             self.playing_logic()
             
             
+            
     def bidding_logic(self):
         
-        next
+        # Let computer bid if no player in that position
+        is_human_player = any(client.position == self.current_turn for client in self.client_list)
+        if not is_human_player:
+            self.opponent_bid()
+            self.advance_turn()
+            self.broadcast()
+            
+        # End no bid round
+        if (
+            len(self.bidding_history) >= 4 
+            and all(bid == "pass" for bid in self.bidding_history[-4:])
+        ):
+            # Iterate new game round
+            self.game_phase = "dealing"
+            # Clear bidding history
+            self.bidding_history = []
+            return
+        
+        # End bidding phase
+        if(
+            len(self.bidding_history) >= 4   
+            and all(bid == "pass" for bid in self.bidding_history[-3:])
+            and self.contract_level != None
+        ):
+            # Set contract team
+            declarer = next(player for player in self.client_list + self.bot_list 
+                            if player.bid_type != "pass")
+            self.contract_team = declarer.team
+            self.game_phase = "playing"
+            self.broadcast()
+            
         
         
     def playing_logic(self):
@@ -378,17 +428,51 @@ class GameServer:
         if player_position != self.current_turn:
             return
         
+        # Transform action back to bid
+        bid_level = action.get("bid_level")
+        bid_suit = action.get("bid_suit")
+        bid_type = action.get("bid_type")
+        
+        # Check validity of bid
+        bid_ordinal = self.get_bid_ordinal(bid_level, bid_suit)
+        contract_ordinal = self.get_bid_ordinal(self.contract_level, self.contract_suit)
+        if bid_ordinal <= contract_ordinal:
+            if bid_type not in ["pass", "double"]:
+                return
+        
         # Find client
         client = next(client for client in self.client_list if client.position == self.current_turn)
         
         # Set bid of that client
         client.bid_level = action.get("bid_level")
         client.bid_suit = action.get("bid_suit")
+        client.bid_type = action.get("bid_type")
         
-        print(f"Player {player_position} bid {client.bid_level} of {client.bid_suit}")
+        print(f"Player {player_position} bid")
+        
+        # Set contract
+        if bid_type == "normal":
+            self.contract_level = client.bid_level
+            self.contract_suit = client.bid_suit
+            
+        # Update bidding history
+        self.bidding_history.append(bid_type)
         
         # Advance turn
         self.advance_turn()
+        
+        
+        
+    def get_bid_ordinal(self, bid_level, bid_suit):
+        """ Calculate stricly increasing value of a bid """
+        
+        if bid_level is None:
+            ordinal = -1
+        else:
+            ordinal = SUITS.index(bid_suit) + (bid_level-1)*5
+       
+        return(ordinal)
+
 
 
     def allocate_trick(self):
@@ -500,8 +584,49 @@ class GameServer:
         
         # Set sound
         self.current_sound = 'play_card'
+        
+        
+        
+    def opponent_bid(self):
+        
+        time.sleep(IDLE_TIME_PLAY)
+        
+        # Select client
+        bot = next(bot for bot in self.bot_list 
+                      if bot.position == self.current_turn)
+        
+        # Randomly choose if bot passes or bids
+        choice = random.choice(["pass", "pass"])
 
-
+        # Bot bids
+        if choice == "bid":
+            if self.contract_level is None:
+                bot.bid_suit = "clubs"
+                bot.bid_level = 1
+                bot.bid_type = "normal"
+            elif self.contract_level < 4:
+                index = (SUITS.index(self.contract_suit) + 1) % 5
+                bot.bid_level = self.contract_level + (index==0)
+                bot.bid_suit = SUITS[index]
+                bot.bid_type = "normal"
+            else:
+                choice = "pass"
+            
+        # Bot passes
+        if choice == "pass":
+            bot.bid_suit = None
+            bot.bid_level = None
+            bot.bid_type = "pass"
+            
+        # Set game contract
+        if choice == "bid":
+            self.contract_level = bot.bid_level
+            self.contract_suit = bot.bid_suit
+            
+        # Update bidding history
+        self.bidding_history.append(bot.bid_type)
+            
+            
 
     def deal_cards(self):
         """Distribute cards among players"""
@@ -531,7 +656,8 @@ class GameServer:
             # Create a personalized game state for this player
             game_state = {
                 "cards": [],
-                "players": [],
+                "clients": [],
+                "bots": [],
                 "game_phase": self.game_phase,
                 "current_turn": self.current_turn,
                 "sound": self.current_sound,
@@ -556,15 +682,28 @@ class GameServer:
                 game_state["cards"].append(card_info)
                 
             # Add player info
-            for player in self.client_list:
-                player_info = {
-                    "name": player.name,
-                    "position": player.position,
-                    "team": player.team,
-                    "bid_suit": player.bid_suit,
-                    "bid_level": player.bid_level
+            for client in self.client_list:
+                client_info = {
+                    "name": client.name,
+                    "position": client.position,
+                    "team": client.team,
+                    "bid_suit": client.bid_suit,
+                    "bid_level": client.bid_level,
+                    "bid_type": client.bid_type
                 }
-                game_state["players"].append(player_info)
+                game_state["clients"].append(client_info)
+                
+            # Add bot info
+            for bot in self.bot_list:
+                bot_info = {
+                    "name": bot.name,
+                    "position": bot.position,
+                    "team": bot.team,
+                    "bid_suit": bot.bid_suit,
+                    "bid_level": bot.bid_level,
+                    "bid_type": bot.bid_type
+                }
+                game_state["bots"].append(bot_info)
             
             # Send game state to client
             try:

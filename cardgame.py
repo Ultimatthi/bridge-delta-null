@@ -451,17 +451,37 @@ class Game(arcade.Window):
     def card_review(self):
 
         if self.last_trick_visible:
-        
-            # Text object
-            text = arcade.Text(
-                "last_trick_info_placeholder",
-                x=self.mouse_x, y=self.mouse_y+30*SCALE,
-                color=arcade.color.WHITE,
-                font_size=22.5*SCALE, font_name="Courier New",
-                anchor_x="center", anchor_y="center",
-                align="center", rotation=0
-            )
-            text.draw()
+            
+            # Tricks
+            tricks = [card for card in self.card_list if card.location == "tricks"]
+            
+            # Check if any tricks
+            if tricks is None:
+                return
+            
+            # Get last trick
+            last_trick = tricks[-4:]
+            
+            # Define mouse offset positions
+            offsets = {
+                "top": (0, 35),
+                "right": (35, 0),
+                "bottom": (0, -35),
+                "left": (-35, 0),
+            }
+                        
+            # Construct review
+            for card in last_trick:
+                # Label
+                value = str(card.value)
+                suit = self.get_suit_symbol(card.suit)
+                label = value + suit
+                # Offset position
+                position = self.get_display_position(self.player_position, card.owner)
+                x, y = offsets[position]
+                # Text object
+                text = self.annotate_text(label, self.mouse_x + x, self.mouse_y + y, 0, 30*SCALE)
+                text.draw()
         
         
     def pull_to_top(self, card: arcade.Sprite):

@@ -7,6 +7,7 @@ import threading
 import pickle
 import time
 import random
+import logic.scoring as sc
 
 
 
@@ -84,7 +85,7 @@ class Client:
 class GameServer:
     
     def __init__(self):
-        self.game_phase = "bidding"
+        self.game_phase = "dealing"
         self.client_list = []
         self.bot_list = []
         self.current_turn = "north"
@@ -125,9 +126,6 @@ class GameServer:
             name = str(position) + "(Bot)"
             bot = Client(None, name, position)
             self.bot_list.append(bot)
-                
-        # Deal cards
-        self.deal_cards()
         
         # Start update loop in seperate thread
         threading.Thread(target=self.update_loop, daemon=True).start()
@@ -196,21 +194,22 @@ class GameServer:
         if len(self.client_list) < FULL_TABLE:
             return
         
-        # Check if all cards are played
-        hand_count = sum(1 for card in self.card_list if card.location == "hand")
-        if hand_count == 0:
-            self.game_phase = "dealing"
-            
         # Start respective game logic
+        
         if self.game_phase == "dealing":
             self.deal_cards()
-            self.game_phase = "bidding"
         
         if self.game_phase == "bidding":
             self.bidding_logic()
             
         if self.game_phase == "playing":
             self.playing_logic()
+            
+        if self.game_phase == "scoring":
+            self.scoring_logic()
+            
+        if self.game_phase == "resetting":
+            self.resetting_logic()
             
             
             
@@ -246,14 +245,13 @@ class GameServer:
             self.contract_team = declarer.team
             self.game_phase = "playing"
             self.broadcast()
-            
+
         
         
     def playing_logic(self):
         
         # Count cards on table
         table = [card for card in self.card_list if card.location == "table"]
-        
         
         if len(table) < 4:
                     
@@ -275,8 +273,64 @@ class GameServer:
                 self.take_trick(self.current_turn)
                 time.sleep(IDLE_TIME_TRICK)
                 self.broadcast()
+                
+        # Count cards on trick pile
+        tricks = [card for card in self.card_list if card.location == "tricks"]
+        
+        # Advance game 
+        if len(tricks) == 52:
+            self.game_phase = "scoring"
 
 
+
+    def scoring_logic(self):
+        
+        # Count tricks of contract team
+        tricks_made = sum(1 for card in self.card_list if card.trick == self.contract_team)/4
+        
+        # Calculate score
+        score = sc.chicago_score(
+                    contract_level = self.contract_level,
+                    contract_suit = self.contract_suit,
+                    doubled = "",
+                    declarer_vulnerable = False,
+                    tricks_made = tricks_made
+                )
+        
+        # Update scoring baord
+        self.score = score.get("total") * (1 if self.contract_team == "northsouth" else -1)
+        
+        # Broadcast state
+        self.broadcast()
+        time.sleep(1.0)
+    
+        # Advance game
+        self.game_phase = "resetting"
+        
+        
+        
+    def resetting_logic(self):
+        
+        # Reset game state for next game
+        self.contract_level = None
+        self.contract_suit = None
+        self.contract_team = None
+        self.bidding_history = []
+        self.current_turn = "north"  # Reset to default starting position
+        
+        # Reset bids
+        for player in self.client_list + self.bot_list:
+            player.bid_suit = None
+            player.bid_level = None
+            player.bid_type = None # pass, double, normal
+            
+        # Broadcast state
+        self.broadcast()
+            
+        # Advance game
+        self.game_phase = "dealing"
+                
+                
 
     def handle_client(self, c, player_position, player_name):
 
@@ -596,7 +650,7 @@ class GameServer:
                       if bot.position == self.current_turn)
         
         # Randomly choose if bot passes or bids
-        choice = random.choice(["pass", "pass"])
+        choice = random.choice(["pass", "bid"])
 
         # Bot bids
         if choice == "bid":
@@ -642,6 +696,9 @@ class GameServer:
             
         # Increate current game by 1
         self.current_game += 1
+        
+        # Advance game
+        self.game_phase = "bidding"
             
         # Send board state to clients
         self.broadcast()
@@ -720,4 +777,5 @@ class GameServer:
 if __name__ == "__main__":
     server = GameServer()
     server.start_server()
+
 

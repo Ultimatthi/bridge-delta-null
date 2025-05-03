@@ -840,6 +840,13 @@ class Game(arcade.Window):
     def adjust_card_position(self):
         """Position the card based on location"""
         
+        # Order cards and delete bidding after every game
+        if self.game_phase == "resetting":
+            self.sort_cards()
+            self.bid_level = None
+            self.bid_suit = None
+            self.bid_type = None
+        
         # Order cards in player's hand
         for position in ("south", "north", "west", "east"):
             # Get cards of that hand
@@ -1089,6 +1096,12 @@ class Game(arcade.Window):
         # Set to "" if None
         label = "" if label is None else label
         
+        # Transfrom to int (if a number)
+        try:
+            label = int(label)
+        except (ValueError, TypeError):
+            pass
+        
         # Transform to string
         label = str(label)
         
@@ -1151,6 +1164,18 @@ class Game(arcade.Window):
         
         symbol = dictionary[suit]
         return(symbol)
+    
+    
+    def sort_cards(self):
+        """ Sort card list in the original order """
+
+        self.card_list.sort(key=self.card_sort_key)
+        
+    def card_sort_key(self, card):
+        
+        suit_index = CARD_SUITS.index(card.suit)
+        value_index = CARD_VALUES.index(card.value)
+        return (suit_index, value_index)
         
         
 

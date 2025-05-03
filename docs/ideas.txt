@@ -1,3 +1,10 @@
-- _elements durch _list ersetzen 
-- Strichdicke auf 2 px
+# general:
+- replace "_elements" with "_list"
+
+# drawing:
+- set line stroke to 2 px
+
+# scoring:
+- consider doubling and redoubling
+- show scoring report
 

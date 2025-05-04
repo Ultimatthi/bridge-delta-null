@@ -1,10 +1,23 @@
+# close:
+- add vulnerable as tag to game_state
+- assign dealer and vulnerable after a game using rotation script
+- add new board element png's
+
 # general:
 - replace "_elements" with "_list"
+- remove unused functions and variables
+- use PEP8 format style
 
 # drawing:
 - set line stroke to 2 px
 
+# lobby:
+- set up a lobby
+
+# playing
+- implement dummy hand after 1. card played
+- fix trump card logic (first follow suit)
+
 # scoring:
 - consider doubling and redoubling
 - show scoring report
-

@@ -8,6 +8,7 @@ import pickle
 import time
 import random
 import logic.scoring as sc
+import logic.rotation as rot
 
 
 
@@ -96,6 +97,7 @@ class GameServer:
         self.score = 0 # Positive: Northsouth, negative: Eastwest
         self.current_game = 0
         self.total_games = 16
+        self.vulnerability = "none" # none, both, northsouth, eastwest
         
         # Sprite list with all the cards
         self.card_list = []
@@ -329,6 +331,9 @@ class GameServer:
             
         # Advance game
         self.game_phase = "dealing"
+        
+        # Rotate dealer and vulnerability
+        self.current_turn, self.vulnerability = rot.chicago_rotate(self.current_game+1)
                 
                 
 
@@ -723,7 +728,8 @@ class GameServer:
                 "contract_team": self.contract_team,
                 "score": self.score,
                 "current_game": self.current_game,
-                "total_games": self.total_games
+                "total_games": self.total_games,
+                "vulnerability": self.vulnerability
             }
             
             # Add card information with appropriate visibility

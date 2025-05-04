@@ -255,6 +255,7 @@ class Game(arcade.Window):
         self.score = 0
         self.current_game = None
         self.total_games = None
+        self.vulnerability = "none"
         
         # Hovered card
         self.hover_card = None
@@ -783,6 +784,7 @@ class Game(arcade.Window):
         self.score = game_state.get("score")
         self.current_game = game_state.get("current_game")
         self.total_games = game_state.get("total_games")
+        self.vulnerability = game_state.get("vulnerability")
         
         # Play sound
         sound = game_state.get("sound")

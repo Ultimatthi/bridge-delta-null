@@ -290,12 +290,18 @@ class GameServer:
         # Count tricks of contract team
         tricks_made = sum(1 for card in self.card_list if card.trick == self.contract_team)/4
         
+        # Was declearer vulnerable?
+        if self.vulnerability in ["both", self.contract_team]:
+            declarer_vulnerable = True
+        else:
+            declarer_vulnerable = False
+        
         # Calculate score
         score = sc.chicago_score(
                     contract_level = self.contract_level,
                     contract_suit = self.contract_suit,
                     doubled = "",
-                    declarer_vulnerable = False,
+                    declarer_vulnerable = declarer_vulnerable,
                     tricks_made = tricks_made
                 )
         

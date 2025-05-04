@@ -1,8 +1,3 @@
-# close:
-- add vulnerable as tag to game_state
-- assign dealer and vulnerable after a game using rotation script
-- add new board element png's
-
 # general:
 - replace "_elements" with "_list"
 - remove unused functions and variables
@@ -19,5 +14,5 @@
 - fix trump card logic (first follow suit)
 
 # scoring:
-- consider doubling and redoubling
+- consider doubling and redoubling (and annotation still uses default there)
 - show scoring report

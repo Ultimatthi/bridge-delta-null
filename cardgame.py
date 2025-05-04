@@ -1022,42 +1022,45 @@ class Game(arcade.Window):
             )
             text.draw()
             
-        # Scoring: Current game
-        x = self.board_scoring.left + 420*SCALE
-        y = self.board_scoring.bottom + 75*SCALE
-        text = self.annotate_text("16", x, y, 0, 22.5)
+        # Contract: Team
+        x = self.board_contract.right - 55*SCALE
+        y = self.board_contract.bottom + 175*SCALE
+        text = self.annotate_state_text(self.contract_team, 17, x, y, 0, 22*SCALE)  # self.contract_team
         text.draw()
         
-        # Scoring: Total games
-        x = self.board_scoring.left + 300*SCALE
-        y = self.board_scoring.bottom + 75*SCALE
-        text = self.annotate_text(self.current_game, x, y, 0, 22.5)
+        # Contract: Bid
+        x = self.board_contract.right - 55*SCALE
+        y = self.board_contract.bottom + 120*SCALE
+        symbol = self.get_suit_symbol(self.contract_suit)
+        value = f"{self.contract_level} of [{symbol}]"
+        text = self.annotate_state_text(value, 18, x, y, 0, 22*SCALE) # self.contract_level/bid
+        text.draw()
+        
+        # Contract: Bid
+        x = self.board_contract.right - 55*SCALE
+        y = self.board_contract.bottom + 65*SCALE
+        text = self.annotate_state_text("No", 15, x, y, 0, 22*SCALE) # To impelment!
         text.draw()
         
         # Scoring: Points
-        x = self.board_scoring.left + 360*SCALE
-        y = self.board_scoring.bottom + 165*SCALE
-        score = self.score * {"northsouth": 1, "eastwest": -1}[self.team]
-        text = self.annotate_text(score, x, y, 0, 22.5)
-        text.draw()
-
-        # Contract: Trump suit
-        x = self.board_contract.left + 420*SCALE
-        y = self.board_contract.bottom + 75*SCALE
-        suit = self.get_suit_symbol(self.contract_suit)
-        text = self.annotate_text(suit, x, y, 0, 30)
+        x = self.board_scoring.right - 55*SCALE
+        y = self.board_scoring.bottom + 175*SCALE
+        value = self.score
+        text = self.annotate_state_text(value, 15, x, y, 0, 22*SCALE)
         text.draw()
         
-        # Contract: Level
-        x = self.board_contract.left + 300*SCALE
-        y = self.board_contract.bottom + 75*SCALE
-        text = self.annotate_text(self.contract_level, x, y, 0, 22.5)
+        # Scoring: Games
+        x = self.board_scoring.right - 55*SCALE
+        y = self.board_scoring.bottom + 120*SCALE
+        value = f"{self.current_game}/{self.total_games}"
+        text = self.annotate_state_text(value, 16, x, y, 0, 22*SCALE)
         text.draw()
         
-        # Contract: Team
-        x = self.board_contract.left + 360*SCALE
-        y = self.board_contract.bottom + 165*SCALE
-        text = self.annotate_text(self.contract_team, x, y, 0, 20)
+        # Scoring: Vulnerability
+        x = self.board_scoring.right - 55*SCALE
+        y = self.board_scoring.bottom + 65*SCALE
+        value = self.vulnerability
+        text = self.annotate_state_text(value, 17, x, y, 0, 22*SCALE)
         text.draw()
         
         
@@ -1111,7 +1114,40 @@ class Game(arcade.Window):
         
         # Return
         return(text)
+    
+    
+    
+    def annotate_state_text(self, value, width, x, y, angle, size):
         
+        # Set to "" if None
+        value = "TBD" if value is None else value
+        
+        # Transfrom to int (if a number)
+        try:
+            value = int(value)
+        except (ValueError, TypeError):
+            pass
+        
+        # Transform to string
+        value = str(value)
+        
+        # Add dots
+        label = '.' * (width - len(value) - 1) + " " + value
+        
+        # Text object
+        text = arcade.Text(
+            label.upper(),
+            x=x, y=y,
+            color=arcade.color.WHITE,
+            font_size=size, font_name="Courier New",
+            anchor_x="right", anchor_y="center",
+            align="right", rotation=angle
+        )
+        
+        # Return
+        return(text)
+    
+    
       
     def annotate_text(self, label, x, y, angle, size):
         

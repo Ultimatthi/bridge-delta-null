@@ -196,6 +196,9 @@ class Game(arcade.Window):
         self.mouse_x = 0
         self.mouse_y = 0
         
+        # Set modifier
+        self.ctrl_held = False
+        
         # Dictiionary: Bidding text position
         position = ["top", "right", "bottom", "left"]
         x = np.array([210, 370, 210, 50])*SCALE
@@ -517,14 +520,22 @@ class Game(arcade.Window):
         buttons = arcade.get_sprites_at_point((x, y), self.button_elements)
         for button_sprite in buttons:
             button_sprite.on_click()
+            
+            
                 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
         """ Called when the user scrolls the mouse wheel. """
-        
+                
+        # Number of repetitions
+        repeat = 5 if self.ctrl_held else 1
+
         if scroll_y > 0:
-            self.increase_bid()
+            for _ in range(repeat):
+                self.increase_bid()
         elif scroll_y < 0:
-            self.decrease_bid()
+            for _ in range(repeat):
+                self.decrease_bid()
+
 
 
     def increase_bid(self):
@@ -696,6 +707,10 @@ class Game(arcade.Window):
     def on_key_press(self, key, _modifiers):
         """ Handle keypresses. """
         
+        # Set modifier
+        if key == arcade.key.LCTRL:
+            self.ctrl_held = True
+            
         # Leave game
         if key == arcade.key.ESCAPE:
             
@@ -717,6 +732,14 @@ class Game(arcade.Window):
             # Close program
             arcade.close_window()
             
+            
+            
+    def on_key_release(self, key, _modifiers):
+        """ Handle keypresses. """
+        
+        # Set modifier
+        if key == arcade.key.LCTRL:
+            self.ctrl_held = False
             
             
     def play_card(self, card):

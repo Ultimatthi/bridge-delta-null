@@ -52,7 +52,6 @@ class ServerCard:
         
         
 class Client:
-    """ Client with all the player's info """
     
     def __init__(self, socket, name, position):
         
@@ -98,6 +97,7 @@ class GameServer:
         self.current_game = 0
         self.total_games = 16
         self.vulnerability = "none" # none, both, northsouth, eastwest
+        self.dummy = None
         
         # Sprite list with all the cards
         self.card_list = []
@@ -245,6 +245,7 @@ class GameServer:
             declarer = next(player for player in self.client_list + self.bot_list 
                             if player.bid_type != "pass")
             self.contract_team = declarer.team
+            self.dummy = PLAYER_POSITIONS[(PLAYER_POSITIONS.index("south")+2) % 4]
             self.game_phase = "playing"
             self.broadcast()
 
@@ -735,7 +736,8 @@ class GameServer:
                 "score": self.score,
                 "current_game": self.current_game,
                 "total_games": self.total_games,
-                "vulnerability": self.vulnerability
+                "vulnerability": self.vulnerability,
+                "dummy": self.dummy
             }
             
             # Add card information with appropriate visibility

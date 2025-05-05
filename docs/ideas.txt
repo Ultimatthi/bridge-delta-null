@@ -6,12 +6,20 @@
 # drawing:
 - set line stroke to 2 px
 
+# connection
+- fix data transfer when rejoining
+
 # lobby:
 - set up a lobby
 
+# bidding:
+- holding CTRL + scroll: jumps to next level
+
 # playing
-- implement dummy hand after 1. card played
 - fix trump card logic (first follow suit)
+- improve dummy card display (ordering)
+- improve dummy card display (south and north position)
+- assign dummy control to declarer
 
 # scoring:
 - consider doubling and redoubling (and annotation still uses default there)

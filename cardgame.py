@@ -256,6 +256,7 @@ class Game(arcade.Window):
         self.current_game = None
         self.total_games = None
         self.vulnerability = "none"
+        self.dummy = None
         
         # Hovered card
         self.hover_card = None
@@ -785,6 +786,7 @@ class Game(arcade.Window):
         self.current_game = game_state.get("current_game")
         self.total_games = game_state.get("total_games")
         self.vulnerability = game_state.get("vulnerability")
+        self.dummy = game_state.get("dummy")
         
         # Play sound
         sound = game_state.get("sound")
@@ -943,6 +945,14 @@ class Game(arcade.Window):
             else:
                 card.position = TABLE_X + CARD_WIDTH*0.6, TABLE_Y
                 card.angle = 40
+            # Calculate dummy offset
+            dummy_position = self.get_display_position(self.player_position, self.dummy)
+            if dummy_position == "right":
+                card.center_x -= CARD_WIDTH
+            elif dummy_position == "left":
+                card.center_x += CARD_WIDTH
+            else:
+                pass
                 
         # Order cards on table [vertically]
         current_index = PLAYER_POSITIONS.index(self.current_turn)
@@ -982,6 +992,57 @@ class Game(arcade.Window):
                 y = board.bottom + CARD_WIDTH/2 + 30*SCALE
                 card.position = x, y
                 
+        # Order cards in dummy
+        self.arrange_dummy_hand()
+                
+                
+                
+    def arrange_dummy_hand(self):
+        
+        # Get cards in dummy's hand
+        dummy_cards = [
+            card for card in self.card_list 
+            if card.owner == self.dummy
+            and card.location == "hand"
+        ]
+        
+        # Get cards in hand
+        hand_cards = [card for card in self.card_list if card.location == "hand"]
+        
+        # Check if game phase is playing
+        if self.game_phase != "playing":
+            return
+        
+        # Check if first card is already played
+        if len(hand_cards) == 52:
+            return
+
+        # Position cards by suit
+        for suit_index, suit in enumerate(CARD_SUITS):
+            # Get a stack of card for each suit
+            suit_cards = [card for card in dummy_cards if card.suit == suit]
+            # Iterate through each stack
+            for card_index, card in enumerate(suit_cards):
+                # Calculate horizontal and vertical position based on suit
+                dummy_position = self.get_display_position(self.player_position, self.dummy)
+                if dummy_position == "left":
+                    x = MARGIN_INNER + (2*suit_index+1)/2*CARD_WIDTH + suit_index*10*SCALE
+                    y = SCREEN_HEIGHT/3*2 - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
+                if dummy_position == "right":
+                    x = SCREEN_WIDTH - MARGIN_INNER - (2*(3-suit_index)+1)/2*CARD_WIDTH - (3-suit_index)*10*SCALE
+                    y = SCREEN_HEIGHT/3*2 - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
+                if dummy_position == "top":
+                    x = SCREEN_WIDTH/2 + ((2*suit_index+1)/2 - 2)*CARD_WIDTH + (suit_index*10 - 15)*SCALE
+                    y = SCREEN_HEIGHT - MARGIN_INNER - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
+                else:
+                    x = SCREEN_WIDTH/2 + ((2*suit_index+1)/2 - 2)*CARD_WIDTH + (suit_index*10 - 15)*SCALE
+                    y = MARGIN_INNER + CARD_HEIGHT/2 + card_index*CARD_HEIGHT/5
+                card.position = x, y
+                card.angle = 0
+                card.facing = "up"
+                
+                
+                
     def color_cards(self):
         """Color all cards that are trump"""
         
@@ -997,6 +1058,9 @@ class Game(arcade.Window):
         
         # Player names
         for player in self.player_list:
+            
+            if player.position == self.dummy:
+                continue
             
             # Get relative board position
             rel_position = self.get_display_position(self.player_position, player.position)

@@ -12,9 +12,6 @@
 # lobby:
 - set up a lobby
 
-# bidding:
-- holding CTRL + scroll: jumps to next level
-
 # playing
 - fix trump card logic (first follow suit)
 - improve dummy card display (ordering)

@@ -47,6 +47,7 @@ BID_TYPES = ["pass", "double", "normal"]
 CARD_WIDTH = 140*CARD_SCALE
 CARD_HEIGHT = 190*CARD_SCALE
 CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
+CARD_VALUES = CARD_VALUES[::-1]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 CARD_ENLARGE = 1.2
@@ -974,6 +975,8 @@ class Game(arcade.Window):
                 card.center_x -= CARD_WIDTH
             elif dummy_position == "left":
                 card.center_x += CARD_WIDTH
+            elif dummy_position == "top":
+                card.center_y -= CARD_WIDTH/4
             else:
                 pass
                 
@@ -1051,10 +1054,10 @@ class Game(arcade.Window):
                 if dummy_position == "left":
                     x = MARGIN_INNER + (2*suit_index+1)/2*CARD_WIDTH + suit_index*10*SCALE
                     y = SCREEN_HEIGHT/3*2 - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
-                if dummy_position == "right":
+                elif dummy_position == "right":
                     x = SCREEN_WIDTH - MARGIN_INNER - (2*(3-suit_index)+1)/2*CARD_WIDTH - (3-suit_index)*10*SCALE
                     y = SCREEN_HEIGHT/3*2 - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
-                if dummy_position == "top":
+                elif dummy_position == "top":
                     x = SCREEN_WIDTH/2 + ((2*suit_index+1)/2 - 2)*CARD_WIDTH + (suit_index*10 - 15)*SCALE
                     y = SCREEN_HEIGHT - MARGIN_INNER - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
                 else:

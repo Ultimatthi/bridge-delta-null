@@ -245,7 +245,7 @@ class GameServer:
             declarer = next(player for player in self.client_list + self.bot_list 
                             if player.bid_type != "pass")
             self.contract_team = declarer.team
-            self.dummy = PLAYER_POSITIONS[(PLAYER_POSITIONS.index("south")+2) % 4]
+            self.dummy = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+2) % 4]
             self.game_phase = "playing"
             self.broadcast()
 

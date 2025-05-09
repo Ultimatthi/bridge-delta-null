@@ -26,19 +26,19 @@ random.seed(42)
 # Calculate window dimensions (effective work area)
 # monitor_info = win32api.GetMonitorInfo(win32api.MonitorFromPoint((0,0)))
 # work_area = monitor_info.get("Work")
-SCREEN_WIDTH = int(1536) # int(work_area[2]/1.1)
-SCREEN_HEIGHT = int(864) #int((work_area[3] - win32api.GetSystemMetrics(4))/1.1)
+SCREEN_WIDTH = int(1536*1.1) # int(work_area[2]/1.1)
+SCREEN_HEIGHT = int(864*1.1) #int((work_area[3] - win32api.GetSystemMetrics(4))/1.1)
 SCREEN_TITLE = 'Bridge: Cardgame'
 
 # Scale unit (to scale everything up or down from a default resolution of 1920x1080)
 SCALE = min(SCREEN_HEIGHT/1080, SCREEN_WIDTH/1920)
-CARD_SCALE = 1.2*SCALE
+CARD_SCALE = 1.0*SCALE
 
 # Board element parameters
 MARGIN_OUTER = 30*SCALE*1
 MARGIN_INNER = 30*SCALE*2
 TABLE_X = SCREEN_WIDTH/2
-TABLE_Y = SCREEN_HEIGHT*0.55
+TABLE_Y = SCREEN_HEIGHT/2
 
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
 BID_TYPES = ["pass", "double", "normal"]
@@ -389,7 +389,7 @@ class Game(arcade.Window):
         # Enlarge card we are hovering above
         if (self.hover_card != None):
             if self.hover_card.location == "hand":
-                self.hover_card.scale = CARD_ENLARGE*CARD_SCALE
+                self.hover_card.scale = CARD_SCALE*CARD_ENLARGE
                 
         # Adjust card facing
         for card in self.card_list:
@@ -969,14 +969,24 @@ class Game(arcade.Window):
             else:
                 card.position = TABLE_X + CARD_WIDTH*0.6, TABLE_Y
                 card.angle = 40
+            # Calculate size of top dummy
+            hearts = sum(1 for card in self.card_list 
+                        if card.location == "hand"
+                        and card.owner == self.dummy
+                        and card.suit == "hearts"
+                    )
+            clubs = sum(1 for card in self.card_list 
+                        if card.location == "hand"
+                        and card.owner == self.dummy
+                        and card.suit == "clubs"
+                    )
+            dummy_height = max(hearts, clubs)
             # Calculate dummy offset
             dummy_position = self.get_display_position(self.player_position, self.dummy)
-            if dummy_position == "right":
-                card.center_x -= CARD_WIDTH
-            elif dummy_position == "left":
-                card.center_x += CARD_WIDTH
+            if dummy_position == "bottom":
+                card.center_y += CARD_HEIGHT/5*max(dummy_height-2, 0)
             elif dummy_position == "top":
-                card.center_y -= CARD_WIDTH/4
+                card.center_y -= CARD_HEIGHT/5*max(dummy_height-2, 0)
             else:
                 pass
                 
@@ -1005,17 +1015,17 @@ class Game(arcade.Window):
         sets = [(stack_team, self.board_tricks_won), (stack_opponent, self.board_tricks_lost)]
         for stack, board in sets:
             for i, card in enumerate(stack):
-                card.angle = 90 # STACK_ANGLES[int(np.floor(i/4))]
+                card.angle = 0
                 batch = int(np.floor(i/4))
                 if len(stack) <= 20:
-                    x = board.left + CARD_HEIGHT/2  + 30*SCALE + batch*17.5*SCALE
+                    x = board.left + CARD_HEIGHT/2 + batch*26*SCALE
                 else:
                     if i < 24:
-                        x = board.left + CARD_HEIGHT/2 + 30*SCALE
+                        x = board.left + CARD_HEIGHT/2
                         card.facing = "wrapped"
                     else:
-                        x = board.left + CARD_HEIGHT/2 + 30*SCALE + batch*17.5*SCALE
-                y = board.bottom + CARD_WIDTH/2 + 30*SCALE
+                        x = board.left + CARD_HEIGHT/2 + batch*26*SCALE
+                y = board.bottom + CARD_WIDTH/2 + 50*SCALE
                 card.position = x, y
                 
         # Order cards in dummy
@@ -1298,7 +1308,6 @@ class Game(arcade.Window):
     
     
     def get_suit_symbol(self, suit):
-        """ Returns suit symbol """
         
         # Dictionary
         dictionary = {

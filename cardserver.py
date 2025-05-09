@@ -325,7 +325,7 @@ class GameServer:
         self.contract_suit = None
         self.contract_team = None
         self.bidding_history = []
-        self.current_turn = "north"  # Reset to default starting position
+        self.dummy = None
         
         # Reset bids
         for player in self.client_list + self.bot_list:

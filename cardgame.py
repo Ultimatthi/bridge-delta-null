@@ -969,24 +969,12 @@ class Game(arcade.Window):
             else:
                 card.position = TABLE_X + CARD_WIDTH*0.6, TABLE_Y
                 card.angle = 40
-            # Calculate size of top dummy
-            hearts = sum(1 for card in self.card_list 
-                        if card.location == "hand"
-                        and card.owner == self.dummy
-                        and card.suit == "hearts"
-                    )
-            clubs = sum(1 for card in self.card_list 
-                        if card.location == "hand"
-                        and card.owner == self.dummy
-                        and card.suit == "clubs"
-                    )
-            dummy_height = max(hearts, clubs)
             # Calculate dummy offset
             dummy_position = self.get_display_position(self.player_position, self.dummy)
             if dummy_position == "bottom":
-                card.center_y += CARD_HEIGHT/5*max(dummy_height-2, 0)
+                card.center_y += CARD_HEIGHT/4
             elif dummy_position == "top":
-                card.center_y -= CARD_HEIGHT/5*max(dummy_height-2, 0)
+                card.center_y -= CARD_HEIGHT/4
             else:
                 pass
                 

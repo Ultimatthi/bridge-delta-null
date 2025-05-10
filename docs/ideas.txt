@@ -14,9 +14,6 @@
 
 # playing
 - fix trump card logic (first follow suit)
-- improve dummy card display (ordering)
-- improve dummy card display (south and north position)
-- assign dummy control to declarer
 
 # scoring:
 - consider doubling and redoubling (and annotation still uses default there)

@@ -432,7 +432,7 @@ class GameServer:
         # Check if player follows suit
         if len(table) > 0:
             if follows_suit:
-                if card_suit not in [table[0].suit, self.contract_suit]:
+                if card_suit not in table[0].suit:
                     return
         
         # Find the card in the server's deck

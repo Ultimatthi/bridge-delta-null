@@ -12,9 +12,5 @@
 # lobby:
 - set up a lobby
 
-# playing
-- fix trump card logic (first follow suit)
-
 # scoring:
-- consider doubling and redoubling (and annotation still uses default there)
 - show scoring report

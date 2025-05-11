@@ -80,6 +80,32 @@ class Client:
         team = team_by_player[position]
         return(team)
     
+    
+    
+class Bid:
+    
+    def __init__(self, player, bid_type, level=None, suit=None):
+        
+        self.player = player
+        self.type = bid_type  # "normal", "pass", "double"
+        self.level = level
+        self.suit = suit
+        
+        # Team
+        self.team = self.allocate_team(self.player)
+        
+    def allocate_team(self, position):
+        """Allocate team based on player's position"""
+        
+        team_by_player = {
+            "north": "northsouth",
+            "south": "northsouth",
+            "east": "eastwest",
+            "west": "eastwest"
+        }
+        team = team_by_player[position]
+        return(team)
+
 
 
 class GameServer:
@@ -92,6 +118,7 @@ class GameServer:
         self.current_sound = None
         self.contract_suit = None
         self.contract_level = None
+        self.contract_doubled = "no"
         self.contract_team = None
         self.score = 0 # Positive: Northsouth, negative: Eastwest
         self.current_game = 0
@@ -217,36 +244,50 @@ class GameServer:
             
     def bidding_logic(self):
         
+        # Check if bidding phase ended
+        bidding_ended = (
+            len(self.bidding_history) >= 4
+            and all(bid.type == "pass" for bid in self.bidding_history[-3:])
+            and self.contract_level is not None
+        )
+        
+        # End bidding phase
+        if bidding_ended:
+            # Find original bid of contract suit
+            declarer_bid = next(
+                bid for bid in self.bidding_history
+                if bid.suit == self.contract_suit 
+                and bid.team == self.contract_team
+            )
+            # Get player of that bid
+            declarer = next(
+                player for player in self.client_list + self.bot_list
+                if player.position == declarer_bid.player
+            )
+            # Set dummy
+            self.dummy = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+2) % 4]
+            # Set game info
+            self.game_phase = "playing"
+            self.current_turn = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+1) % 4]
+            self.broadcast()
+            return
+
+        # Check no bid round
+        no_bid_round = (
+            len(self.bidding_history) >= 4 
+            and all(bid.type == "pass" for bid in self.bidding_history[-4:])
+        )
+        
+        # # Iterate new game round
+        if no_bid_round:
+            self.game_phase = "resetting"
+            return
+        
         # Let computer bid if no player in that position
         is_human_player = any(client.position == self.current_turn for client in self.client_list)
         if not is_human_player:
             self.opponent_bid()
             self.advance_turn()
-            self.broadcast()
-            
-        # End no bid round
-        if (
-            len(self.bidding_history) >= 4 
-            and all(bid == "pass" for bid in self.bidding_history[-4:])
-        ):
-            # Iterate new game round
-            self.game_phase = "dealing"
-            # Clear bidding history
-            self.bidding_history = []
-            return
-        
-        # End bidding phase
-        if(
-            len(self.bidding_history) >= 4   
-            and all(bid == "pass" for bid in self.bidding_history[-3:])
-            and self.contract_level != None
-        ):
-            # Set contract team
-            declarer = next(player for player in self.client_list + self.bot_list 
-                            if player.bid_type != "pass")
-            self.contract_team = declarer.team
-            self.dummy = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+2) % 4]
-            self.game_phase = "playing"
             self.broadcast()
 
         
@@ -301,7 +342,7 @@ class GameServer:
         score = sc.chicago_score(
                     contract_level = self.contract_level,
                     contract_suit = self.contract_suit,
-                    doubled = "",
+                    doubled = self.contract_doubled,
                     declarer_vulnerable = declarer_vulnerable,
                     tricks_made = tricks_made
                 )
@@ -323,6 +364,7 @@ class GameServer:
         # Reset game state for next game
         self.contract_level = None
         self.contract_suit = None
+        self.contract_doubled = "no"
         self.contract_team = None
         self.bidding_history = []
         self.dummy = None
@@ -505,6 +547,22 @@ class GameServer:
         if bid_ordinal <= contract_ordinal:
             if bid_type not in ["pass", "double"]:
                 return
+            
+        # Check if doubling is allowed
+        if bid_type == "double":
+            # No doubling before any normal bid
+            if self.contract_level is None:
+                return
+            # No doubling of already doubled bid
+            elif self.contract_doubled == "yes":
+                return
+            # No doubling of partner's bid
+            elif (
+                len(self.bidding_history) >= 2 
+                and self.bidding_history[-1].type == "pass" 
+                and self.bidding_history[-2].type == "normal"
+            ):
+                return
         
         # Find client
         client = next(client for client in self.client_list if client.position == self.current_turn)
@@ -520,9 +578,17 @@ class GameServer:
         if bid_type == "normal":
             self.contract_level = client.bid_level
             self.contract_suit = client.bid_suit
+            self.contract_team = client.team
+            # Reset double
+            self.contract_doubled = "no"
+            
+        # Doubling contract
+        if bid_type == "double":
+            self.contract_doubled = "yes"
             
         # Update bidding history
-        self.bidding_history.append(bid_type)
+        bid = Bid(client.position, bid_type, bid_level, bid_suit)
+        self.bidding_history.append(bid)
         
         # Advance turn
         self.advance_turn()
@@ -688,9 +754,12 @@ class GameServer:
         if choice == "bid":
             self.contract_level = bot.bid_level
             self.contract_suit = bot.bid_suit
+            self.contract_team = bot.team
+            self.contract_doubled = "no"
             
         # Update bidding history
-        self.bidding_history.append(bot.bid_type)
+        bid = Bid(bot.position, bot.bid_type, bot.bid_level, bot.bid_suit)
+        self.bidding_history.append(bid)
             
             
 
@@ -732,6 +801,7 @@ class GameServer:
                 "sound": self.current_sound,
                 "contract_suit": self.contract_suit,
                 "contract_level": self.contract_level,
+                "contract_doubled": self.contract_doubled,
                 "contract_team": self.contract_team,
                 "score": self.score,
                 "current_game": self.current_game,

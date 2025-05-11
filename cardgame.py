@@ -255,6 +255,7 @@ class Game(arcade.Window):
         self.current_sound = None
         self.contract_suit = None
         self.contract_level = None
+        self.contract_doubled = "no"
         self.contract_team = None
         self.score = 0
         self.current_game = None
@@ -805,6 +806,7 @@ class Game(arcade.Window):
         self.current_turn = game_state.get("current_turn")
         self.contract_suit = game_state.get("contract_suit")
         self.contract_level = game_state.get("contract_level")
+        self.contract_doubled = game_state.get("contract_doubled")
         self.contract_team = game_state.get("contract_team")
         self.score = game_state.get("score")
         self.current_game = game_state.get("current_game")
@@ -1127,7 +1129,7 @@ class Game(arcade.Window):
         # Contract: Bid
         x = self.board_contract.right - 55*SCALE
         y = self.board_contract.bottom + 65*SCALE
-        text = self.annotate_state_text("No", 15, x, y, 0, 22*SCALE) # To impelment!
+        text = self.annotate_state_text(self.contract_doubled, 15, x, y, 0, 22*SCALE)
         text.draw()
         
         # Scoring: Points

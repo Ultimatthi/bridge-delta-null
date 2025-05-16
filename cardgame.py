@@ -11,14 +11,11 @@ import time
 # import win32api 
 import numpy as np
 import random
-
+import arcade.gui
+import pyperclip
 
 
 # ──[ Parameters ]─────────────────────────────────────────────────────────────
-
-# Connection paramter
-HOST = '87.245.102.13'
-PORT = 55556
 
 # Set seed
 random.seed(42)
@@ -26,8 +23,8 @@ random.seed(42)
 # Calculate window dimensions (effective work area)
 # monitor_info = win32api.GetMonitorInfo(win32api.MonitorFromPoint((0,0)))
 # work_area = monitor_info.get("Work")
-SCREEN_WIDTH = int(1536*1.1) # int(work_area[2]/1.1)
-SCREEN_HEIGHT = int(864*1.1) #int((work_area[3] - win32api.GetSystemMetrics(4))/1.1)
+SCREEN_WIDTH = int(1600) # int(work_area[2]/1.1)
+SCREEN_HEIGHT = int(900) #int((work_area[3] - win32api.GetSystemMetrics(4))/1.1)
 SCREEN_TITLE = 'Bridge: Cardgame'
 
 # Scale unit (to scale everything up or down from a default resolution of 1920x1080)
@@ -56,6 +53,8 @@ CARD_ENLARGE = 1.2
 # Light
 LIGHT_RADIUS = SCREEN_WIDTH*0.9
 
+# Lobby
+LOBBY_SCALE = 1/1.5  # Extracted scale factor to constant
 
 
 
@@ -164,13 +163,20 @@ class Button(arcade.Sprite):
         self.scale = self.original_scale
             
 
-# ──[ Spielklasse ]────────────────────────────────────────────────────────────
+# ──[ Game View ]─────────────────────────────────────────────────────────────
 
-class Game(arcade.Window):
+class Game(arcade.View):
     """ Main application class. """
 
-    def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+    def __init__(self, username='anonymous', server='localhost', position=None):
+        super().__init__()
+        
+        # Transfer parameters
+        self.player_name = username
+        host_str, port_str = server.split(":")
+        self.host = host_str
+        self.port = int(port_str)
+        self.player_position = position if position is not None else "north"
 
         # Play mat colour
         self.background_color = arcade.color.ARSENIC
@@ -205,12 +211,6 @@ class Game(arcade.Window):
         x = np.array([210, 370, 210, 50])*SCALE
         y = np.array([410, 250, 90, 250])*SCALE
         self.dict_bidding_position = {pos: (x[i], y[i]) for i, pos in enumerate(position)}
-        
-        # Ask for position
-        self.player_position = "north" #input("Position: ")
-        
-        # Ask for username
-        self.player_name = "matt" #input("Username: ")
         
         # Allocate team
         self.team = self.allocate_team(self.player_position)
@@ -362,7 +362,7 @@ class Game(arcade.Window):
         
         # Connect to socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((HOST, PORT))
+        self.socket.connect((self.host, self.port))
         
         # Send player data to server
         data = {
@@ -679,31 +679,31 @@ class Game(arcade.Window):
         buttons = arcade.get_sprites_at_point((x, y), self.button_elements)
         
         # Set cursor type to default
-        cursor_type = self.CURSOR_DEFAULT
+        cursor_type = self.window.CURSOR_DEFAULT
         
         # Set cursor type to "hand" if hovering above button
         if buttons:
-            cursor_type = self.CURSOR_HAND
+            cursor_type = self.window.CURSOR_HAND
                 
         # Set cursor type to "hand" if hovering card above hand card
         if len(cards) > 0:
             if cards[-1].location == "hand" and cards[-1].owner == self.player_position:
-                cursor_type = self.CURSOR_HAND
+                cursor_type = self.window.CURSOR_HAND
                 
         # Set cursor type to "hand" if hovering card above trick ready to take
         if len(cards) > 0:
             if len(table) == 4 and cards[-1].location == "table":
-                cursor_type = self.CURSOR_HAND
+                cursor_type = self.window.CURSOR_HAND
                 
         # Set cursor type to "cross" if hovering over a card of the last trick taken
         self.last_trick_visible = False  
         if len(cards) > 0 and len(tricks) > 0:
             if cards[-1] == tricks[-1]:
-                cursor_type = self.CURSOR_CROSSHAIR
+                cursor_type = self.window.CURSOR_CROSSHAIR
                 self.last_trick_visible = True
                
         # Set cursor
-        self.set_mouse_cursor(self.get_system_mouse_cursor(cursor_type))
+        self.window.set_mouse_cursor(self.window.get_system_mouse_cursor(cursor_type))
                 
         
     def on_key_press(self, key, _modifiers):
@@ -1324,14 +1324,249 @@ class Game(arcade.Window):
         value_index = CARD_VALUES.index(card.value)
         return (suit_index, value_index)
         
+
+
+# ──[ Lobby Class ]────────────────────────────────────────────────────────────
+
+class MenuView(arcade.View):
+    """Menu/lobby view class."""
+
+    def __init__(self):
+        super().__init__()
+        self.toggle_list = []
+        
+        # Load assets
+        self.load_assets()
+        
+        # Set up UI elements
+        self.setup_ui_styles()
+        self.create_ui_elements()
+        self.position_ui_elements()
+        self.setup_event_handlers()
+
+    def load_assets(self):
+        """Load all required assets."""
+        # Background image
+        self.background = arcade.load_texture("assets/images/lobby.background.png")
+        
+        # Load sound effects
+        self.sound_drop = arcade.load_sound("assets/effects/drop.mp3")
+        
+        # Load font
+        arcade.load_font("assets/fonts/CourierNewBold.ttf")
+        
+        # Load button textures
+        self.textures = {
+            "north_off": arcade.load_texture("assets/images/button.north.off.png"),
+            "north_on": arcade.load_texture("assets/images/button.north.on.png"),
+            "east_off": arcade.load_texture("assets/images/button.east.off.png"),
+            "east_on": arcade.load_texture("assets/images/button.east.on.png"),
+            "south_off": arcade.load_texture("assets/images/button.south.off.png"),
+            "south_on": arcade.load_texture("assets/images/button.south.on.png"),
+            "west_off": arcade.load_texture("assets/images/button.west.off.png"),
+            "west_on": arcade.load_texture("assets/images/button.west.on.png"),
+            "random_off": arcade.load_texture("assets/images/button.random.off.png"),
+            "random_on": arcade.load_texture("assets/images/button.random.on.png"),
+            "join_off": arcade.load_texture("assets/images/button.join.off.png"),
+            "join_on": arcade.load_texture("assets/images/button.join.on.png")
+        }
+
+    def setup_ui_styles(self):
+        """Set up UI widget styles."""
+        # Input text widget style - transparent background with no border
+        self.input_style = arcade.gui.widgets.text.UIInputTextStyle(
+            bg=(0, 0, 0, 0),
+            border=None,
+            border_width=0
+        )
+        
+        # Flat button style
+        self.button_style = arcade.gui.widgets.buttons.UIFlatButtonStyle(
+            font_size=15,
+            font_name="Courier New",
+            font_color=arcade.color.WHITE,
+            bg=(9, 25, 34, 255),
+            border=None,
+            border_width=0
+        )
+
+    def create_ui_elements(self):
+        """Create all UI elements."""
+        self.manager = arcade.gui.UIManager()
+        
+        # Create text input fields
+        self.username_widget = arcade.gui.UIInputText(
+            text="Icarus",
+            height=35 * LOBBY_SCALE, 
+            width=(370 - 2 * 12) * LOBBY_SCALE,
+            font_name="Courier New",
+            font_size=15,
+            border_width=0,
+            style={state: self.input_style for state in ["normal", "hover", "focus", "press", "disabled", "invalid"]}
+        )
+        
+        self.server_widget = arcade.gui.UIInputText(
+            text="localhost:55556",
+            height=35 * LOBBY_SCALE, 
+            width=(370 - 2 * 12) * LOBBY_SCALE,
+            font_name="Courier New",
+            font_size=15,
+            border_width=0,
+            style={state: self.input_style for state in ["normal", "hover", "focus", "press", "disabled", "invalid"]}
+        )
+        
+        # Create launch button
+        self.launch_widget = arcade.gui.UITextureButton(
+            height=102 * LOBBY_SCALE,
+            width=412 * LOBBY_SCALE,
+            texture=self.textures["join_off"],
+            texture_hovered=self.textures["join_on"]
+        )
+        
+        # Create position toggle buttons
+        self.create_position_toggles()
+
+    def create_position_toggles(self):
+        """Create the position toggle buttons."""
+        # Position name mapping for each toggle
+        position_names = ["north", "east", "south", "west", "random"]
+        self.toggle_positions = {}
+
+        # Create all position toggles in a loop
+        for position in position_names:
+            toggle = arcade.gui.UITextureToggle(
+                height=60 * LOBBY_SCALE, 
+                width=60 * LOBBY_SCALE,
+                on_texture=self.textures[f"{position}_on"],
+                off_texture=self.textures[f"{position}_off"],
+                value=False
+            )
+            self.toggle_list.append(toggle)
+            self.toggle_positions[position] = toggle
+            
+            # Store references to specific toggles for positioning later
+            setattr(self, f"{position}_widget", toggle)
+
+    def position_ui_elements(self):
+        """Position all UI elements on the screen."""
+        # Create main anchor layout
+        self.anchor = self.manager.add(arcade.gui.UIAnchorLayout())
+        
+        # Position username input
+        self.anchor.add(
+            child=self.username_widget,
+            anchor_x="left", align_x=(280 + 12) * LOBBY_SCALE,
+            anchor_y="bottom", align_y=(795 + 12) * LOBBY_SCALE
+        )
+        
+        # Position server input
+        self.anchor.add(
+            child=self.server_widget,
+            anchor_x="left", align_x=(280 + 12) * LOBBY_SCALE,
+            anchor_y="bottom", align_y=(635 + 12) * LOBBY_SCALE
+        )
+        
+        # Position launch button
+        self.anchor.add(
+            child=self.launch_widget,
+            anchor_x="left", align_x=258 * LOBBY_SCALE,
+            anchor_y="bottom", align_y=177 * LOBBY_SCALE
+        )
+        
+        # Position toggle buttons
+        self.position_toggle_buttons()
+
+    def position_toggle_buttons(self):
+        """Position the toggle buttons."""
+        positions = [
+            (self.north_widget, 280),
+            (self.east_widget, 357.5),
+            (self.south_widget, 435),
+            (self.west_widget, 512.5),
+            (self.random_widget, 590)
+        ]
+        
+        for widget, x_pos in positions:
+            self.anchor.add(
+                child=widget,
+                anchor_x="left", align_x=x_pos * LOBBY_SCALE,
+                anchor_y="bottom", align_y=465 * LOBBY_SCALE
+            )
+
+    def setup_event_handlers(self):
+        """Set up all event handlers for UI elements."""
+        # Launch button event
+        @self.launch_widget.event("on_click")
+        def on_click_start_new_game_button(event):
+            arcade.play_sound(self.sound_drop)
+            
+            # Get the selected position
+            selected_position = None
+            for position, toggle in self.toggle_positions.items():
+                if toggle.value:
+                    selected_position = position
+                    break
+            
+            # Create main view with the user inputs
+            window = arcade.Window(1600, 900, "Bridge: Client", resizable=False)
+            main_view = Game(
+                username=self.username_widget.text,
+                server=self.server_widget.text,
+                position=selected_position
+            )
+            main_view.setup()
+            window.show_view(main_view)
+        
+        # Toggle button events - only one can be selected at a time
+        for toggle in self.toggle_list:
+            @toggle.event("on_click")
+            def handle_toggle(event, toggle=toggle):  # Default-arg-trick for closure
+                for other in self.toggle_list:
+                    if other != toggle:
+                        other.value = False
+                
+                arcade.play_sound(self.sound_drop)
+
+    def on_show_view(self):
+        """Called when this view becomes active."""
+        self.manager.enable()
+
+    def on_hide_view(self):
+        """Called when this view is deactivated."""
+        self.manager.disable()
+
+    def on_draw(self):
+        """Render the screen."""
+        self.clear()
+        
+        # Draw background
+        rect = arcade.LBWH(left=0, bottom=0, width=self.window.width, height=self.window.height)
+        arcade.draw_texture_rect(texture=self.background,rect=rect)
+        
+        # Draw UI elements
+        self.manager.draw()
+
+    def on_key_press(self, key, modifiers):
+        """Handle key presses, especially for clipboard operations."""
+        # Handle Ctrl+V (paste)
+        if key == arcade.key.V and modifiers & arcade.key.MOD_CTRL:
+            clipboard_text = pyperclip.paste()
+            
+            # Add text to the active input field
+            if self.username_widget.active:
+                self.username_widget.text += clipboard_text
+            elif self.server_widget.active:
+                self.server_widget.text += clipboard_text
+            
         
 
 # ──[ Main ]───────────────────────────────────────────────────────────────────
 
 def main():
     """ Main function """
-    window = Game()
-    window.setup()
+    window = arcade.Window(1280, 720, "Bridge: Launcher", resizable=False)
+    menu_view = MenuView()  # Start with menu view
+    window.show_view(menu_view)
     arcade.run()
 
 

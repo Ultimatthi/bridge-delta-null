@@ -794,8 +794,7 @@ class GameServer:
             # Create a personalized game state for this player
             game_state = {
                 "cards": [],
-                "clients": [],
-                "bots": [],
+                "players": [],
                 "game_phase": self.game_phase,
                 "current_turn": self.current_turn,
                 "sound": self.current_sound,
@@ -823,28 +822,16 @@ class GameServer:
                 game_state["cards"].append(card_info)
                 
             # Add player info
-            for client in self.client_list:
-                client_info = {
-                    "name": client.name,
-                    "position": client.position,
-                    "team": client.team,
-                    "bid_suit": client.bid_suit,
-                    "bid_level": client.bid_level,
-                    "bid_type": client.bid_type
+            for player in self.client_list + self.bot_list:
+                player_info = {
+                    "name": player.name,
+                    "position": player.position,
+                    "team": player.team,
+                    "bid_suit": player.bid_suit,
+                    "bid_level": player.bid_level,
+                    "bid_type": player.bid_type
                 }
-                game_state["clients"].append(client_info)
-                
-            # Add bot info
-            for bot in self.bot_list:
-                bot_info = {
-                    "name": bot.name,
-                    "position": bot.position,
-                    "team": bot.team,
-                    "bid_suit": bot.bid_suit,
-                    "bid_level": bot.bid_level,
-                    "bid_type": bot.bid_type
-                }
-                game_state["bots"].append(bot_info)
+                game_state["players"].append(player_info)
             
             # Send game state to client
             try:

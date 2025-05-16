@@ -819,35 +819,22 @@ class Game(arcade.View):
         self.play_sound(sound)
         
         # Get player/bot  info
-        client_list = game_state.get("clients")
-        bot_list = game_state.get("bots")
+        player_list = game_state.get("players")
         
         # Setup map for fast access
         player_map = {player.position: player for player in self.player_list}
         
         # Update player variables with clients
-        for client in client_list:
+        for server_player in player_list:
             # Get player
-            position = client["position"]
+            position = server_player["position"]
             player = player_map[position]
             # Fill in attributes
-            player.name = client["name"]
-            player.team = client["team"]
-            player.bid_suit = client["bid_suit"]
-            player.bid_level = client["bid_level"]
-            player.bid_type = client["bid_type"]
-                
-        # Update player variables with bots
-        for bot in bot_list:
-            # Get player
-            position = bot["position"]
-            player = player_map[position]
-            # Fill in attributes
-            player.name = bot["name"]
-            player.team = bot["team"]
-            player.bid_suit = bot["bid_suit"]
-            player.bid_level = bot["bid_level"]
-            player.bid_type = bot["bid_type"]
+            player.name = server_player["name"]
+            player.team = server_player["team"]
+            player.bid_suit = server_player["bid_suit"]
+            player.bid_level = server_player["bid_level"]
+            player.bid_type = server_player["bid_type"]
             
         # Get logical card variables
         logical_card_list = game_state.get("cards")

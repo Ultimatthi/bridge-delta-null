@@ -15,46 +15,44 @@ import pyperclip
 
 # ──[ Parameters ]─────────────────────────────────────────────────────────────
 
-# Set seed
+# Set consistent random seed
 random.seed(42)
 
-# Calculate window dimensions (effective work area)
-# monitor_info = win32api.GetMonitorInfo(win32api.MonitorFromPoint((0,0)))
-# work_area = monitor_info.get("Work")
-SCREEN_WIDTH = int(1600) # int(work_area[2]/1.1)
-SCREEN_HEIGHT = int(900) #int((work_area[3] - win32api.GetSystemMetrics(4))/1.1)
-SCREEN_TITLE = 'Bridge: Cardgame'
+# Window dimensions
+SCREEN_WIDTH = 1600
+SCREEN_HEIGHT = 900
+SCREEN_TITLE = 'Bridge: Card Game'
 
-# Scale unit (to scale everything up or down from a default resolution of 1920x1080)
+# Scaling parameters
 SCALE = min(SCREEN_HEIGHT/1080, SCREEN_WIDTH/1920)
-CARD_SCALE = 1.0*SCALE
+CARD_SCALE = 1.0 * SCALE
 
-# Board element parameters
-MARGIN_OUTER = 30*SCALE*1
-MARGIN_INNER = 30*SCALE*2
-TABLE_X = SCREEN_WIDTH/2
-TABLE_Y = SCREEN_HEIGHT/2
+# Layout dimensions
+MARGIN_OUTER = 30 * SCALE
+MARGIN_INNER = 60 * SCALE
+TABLE_X = SCREEN_WIDTH / 2
+TABLE_Y = SCREEN_HEIGHT / 2
 
+# Game constants
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
 BID_TYPES = ["pass", "double", "normal"]
-
-# Cards parameters
-CARD_WIDTH = 140*CARD_SCALE
-CARD_HEIGHT = 190*CARD_SCALE
-CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
-CARD_VALUES = CARD_VALUES[::-1]
+CARD_WIDTH = 140 * CARD_SCALE
+CARD_HEIGHT = 190 * CARD_SCALE
+CARD_VALUES = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 CARD_ENLARGE = 1.1
-# STACK_ANGLES = x = [random.uniform(88.0, 92.0) for _ in range(13)]
 
-# Light
-LIGHT_RADIUS = SCREEN_WIDTH*0.9
+# Light configuration
+LIGHT_RADIUS = SCREEN_WIDTH * 0.9
 
-# Lobby
-LOBBY_SCALE = 1/1.5  # Extracted scale factor to constant
+# Lobby dimensions
+LOBBY_WIDTH = 1280
+LOBBY_HEIGHT = 720
+LOBBY_TITLE = "Bridge: Lobby"
 
-
+# Lobby scaling paramters
+LOBBY_SCALE = min(LOBBY_HEIGHT/1080, LOBBY_WIDTH/1920)
 
 # ──[ Classes ]────────────────────────────────────────────────────────────────
 
@@ -372,8 +370,8 @@ class Game(arcade.View):
         self.socket.sendall(pickle.dumps(data))
         
         # Start thread to receive messages
-        recv_thread = threading.Thread(target=self.receive_state, daemon=True)
-        recv_thread.start()
+        self.recv_thread = threading.Thread(target=self.receive_state, daemon=True)
+        self.recv_thread.start()
 
         
         
@@ -729,12 +727,12 @@ class Game(arcade.View):
             except Exception:
                 pass
             finally:
-                self.socket.close()
+                pass #self.socket.close()
                 
             # Switch to Lobby
             menu_view = MenuView()
-            self.window.set_size(1280, 720)
-            self.window.set_caption("Bridge: Launcher")
+            self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+            self.window.set_caption(LOBBY_TITLE)
             self.window.show_view(menu_view)
             
             
@@ -1556,7 +1554,7 @@ class MenuView(arcade.View):
 
 def main():
     """ Main function """
-    window = arcade.Window(1280, 720, "Bridge: Launcher", resizable=False)
+    window = arcade.Window(LOBBY_WIDTH, LOBBY_HEIGHT, LOBBY_TITLE, resizable=False)
     menu_view = MenuView()  # Start with menu view
     window.show_view(menu_view)
     arcade.run()

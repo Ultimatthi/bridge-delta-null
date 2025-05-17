@@ -20,6 +20,7 @@ bridge/
 - Python 3.x
 - Python library: Arcade 3.1
 - Python library: NumPy 2.2
+- Python library: Pyperclip 1.9
 
 ### Installation
 
@@ -34,7 +35,8 @@ bridge/
 3. Install required dependencies:
    ```bash
    pip install arcade
-   pip install numpy
+   pip install nump
+   pip install pyperclip
    ```
 4. Start the server (once):
    ```bash

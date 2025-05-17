@@ -8,12 +8,10 @@ import socket
 import threading
 import pickle
 import time
-# import win32api 
 import numpy as np
 import random
 import arcade.gui
 import pyperclip
-
 
 # ──[ Parameters ]─────────────────────────────────────────────────────────────
 
@@ -47,7 +45,7 @@ CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 CARD_VALUES = CARD_VALUES[::-1]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
-CARD_ENLARGE = 1.2
+CARD_ENLARGE = 1.1
 # STACK_ANGLES = x = [random.uniform(88.0, 92.0) for _ in range(13)]
 
 # Light
@@ -273,6 +271,8 @@ class Game(arcade.View):
         for card_suit in CARD_SUITS:
             for card_value in CARD_VALUES:
                 card = Card(card_suit, card_value, "up", None, None, CARD_SCALE)
+                card.position = SCREEN_WIDTH/2, SCREEN_HEIGHT/2
+                card.angle = random.uniform(-5, 5)
                 self.card_list.append(card)
         
         # Create every player
@@ -731,9 +731,11 @@ class Game(arcade.View):
             finally:
                 self.socket.close()
                 
-            # Close program
-            arcade.close_window()
-            
+            # Switch to Lobby
+            menu_view = MenuView()
+            self.window.set_size(1280, 720)
+            self.window.set_caption("Bridge: Launcher")
+            self.window.show_view(menu_view)
             
             
     def on_key_release(self, key, _modifiers):
@@ -1495,14 +1497,17 @@ class MenuView(arcade.View):
                     break
             
             # Create main view with the user inputs
-            window = arcade.Window(1600, 900, "Bridge: Client", resizable=False)
             main_view = Game(
                 username=self.username_widget.text,
                 server=self.server_widget.text,
                 position=selected_position
             )
             main_view.setup()
-            window.show_view(main_view)
+            
+            # Open main view
+            self.window.set_size(SCREEN_WIDTH, SCREEN_HEIGHT)
+            self.window.set_caption("Bridge: Client")
+            self.window.show_view(main_view)
         
         # Toggle button events - only one can be selected at a time
         for toggle in self.toggle_list:

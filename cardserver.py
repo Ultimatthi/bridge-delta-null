@@ -337,12 +337,18 @@ class GameServer:
             declarer_vulnerable = True
         else:
             declarer_vulnerable = False
+            
+        # Is contract doubled?
+        if self.contract_doubled == "yes":
+            doubled = "X"
+        else:
+            doubled = ""
         
         # Calculate score
         score = sc.chicago_score(
                     contract_level = self.contract_level,
                     contract_suit = self.contract_suit,
-                    doubled = self.contract_doubled,
+                    doubled = doubled,
                     declarer_vulnerable = declarer_vulnerable,
                     tricks_made = tricks_made
                 )

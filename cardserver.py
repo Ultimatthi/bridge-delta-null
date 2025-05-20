@@ -332,6 +332,8 @@ class GameServer:
         # Count tricks of contract team
         tricks_made = sum(1 for card in self.card_list if card.trick == self.contract_team)/4
         
+        print(tricks_made)
+        
         # Was declearer vulnerable?
         if self.vulnerability in ["both", self.contract_team]:
             declarer_vulnerable = True
@@ -354,7 +356,7 @@ class GameServer:
                 )
         
         # Update scoring baord
-        self.score = score.get("total") * (1 if self.contract_team == "northsouth" else -1)
+        self.score += score.get("total") * (1 if self.contract_team == "northsouth" else -1)
         
         # Broadcast state
         self.broadcast()

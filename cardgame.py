@@ -280,6 +280,13 @@ class Game(arcade.View):
             name = str(position) + "(Bot)"
             player = Player(name, position)
             self.player_list.append(player)
+            
+        # Create board elements: Border 
+        image_path = r'assets/images/board.border.png'
+        self.board_border = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH/2
+        y = SCREEN_HEIGHT/2
+        self.board_border.position = x, y
               
         # Create board elements: Scoring area
         image_path = r'assets/images/board.scoring.png'
@@ -315,6 +322,7 @@ class Game(arcade.View):
         self.board_texture.position = SCREEN_WIDTH/2, SCREEN_HEIGHT/2
         
         # Add to board element list
+        self.board_elements.append(self.board_border)
         self.board_elements.append(self.board_scoring)
         self.board_elements.append(self.board_contract)
         self.board_elements.append(self.board_tricks_won)
@@ -421,16 +429,6 @@ class Game(arcade.View):
             
             # Draw board elements
             self.board_elements.draw()
-            
-            # Draw playfield border
-            arcade.draw_lrbt_rectangle_outline(
-                left=MARGIN_OUTER,
-                right=SCREEN_WIDTH - MARGIN_OUTER,
-                bottom=MARGIN_OUTER,
-                top=SCREEN_HEIGHT - MARGIN_OUTER,
-                color=arcade.color.WHITE,
-                border_width=2*SCALE
-            )
             
             # Color cards
             self.color_cards()
@@ -882,7 +880,8 @@ class Game(arcade.View):
             arcade.play_sound(self.sound_drop)
         elif sound == 'lock':
             arcade.play_sound(self.sound_lock)
-        
+            
+            
         
     def adjust_card_position(self):
         """Position the card based on location"""
@@ -1080,35 +1079,50 @@ class Game(arcade.View):
     def annotate(self):
         
         # HCP overlay
-        hcp_count = sum(card.hcp for card in self.card_list if card.owner == self.player_position)
-        label = str(hcp_count) + " HCP"
-        x = self.hcp_overlay.center_x
-        y = self.hcp_overlay.center_y
-        text = self.annotate_text(label, x, y, 0, 18)
-        text.draw()
+        if self.game_phase == "bidding":
+            hcp_count = sum(card.hcp for card in self.card_list if card.owner == self.player_position)
+            label = str(hcp_count) + " HCP"
+            x = self.hcp_overlay.center_x
+            y = self.hcp_overlay.center_y
+            text = self.annotate_text(label, x, y, 0, 18)
+            text.draw()
         
         # Player names
         for player in self.player_list:
             
-            if player.position == self.dummy:
-                continue
+            # Check if this is the dummy player
+            is_dummy = player.position == self.dummy
             
             # Get relative board position
             rel_position = self.get_display_position(self.player_position, player.position)
             
             # Define annotation position
             if rel_position == 'bottom':
-                x, y, a = SCREEN_WIDTH/2, CARD_HEIGHT/8*9, 0
+                x = SCREEN_WIDTH / 2
+                y = MARGIN_OUTER if is_dummy else CARD_HEIGHT / 8 * 9
+                a = 0
             elif rel_position == 'left':
-                x, y, a = CARD_HEIGHT/4*3, SCREEN_HEIGHT/2, -90
+                x = MARGIN_OUTER if is_dummy else CARD_HEIGHT / 4 * 3
+                y = SCREEN_HEIGHT / 2
+                a = -90
             elif rel_position == 'top':
-                x, y, a = SCREEN_WIDTH/2, SCREEN_HEIGHT - CARD_HEIGHT/4*3, 0
+                x = SCREEN_WIDTH / 2
+                y = SCREEN_HEIGHT - MARGIN_OUTER if is_dummy else SCREEN_HEIGHT - CARD_HEIGHT / 4 * 3
+                a = 0
+            else:  # 'right'
+                x = SCREEN_WIDTH - MARGIN_OUTER if is_dummy else SCREEN_WIDTH - CARD_HEIGHT / 4 * 3
+                y = SCREEN_HEIGHT / 2
+                a = 90
+                
+            # Define label
+            if player.position == self.current_turn:
+                label = "▸"  + player.name.upper() + "◂"
             else:
-                x, y, a = SCREEN_WIDTH - CARD_HEIGHT/4*3, SCREEN_HEIGHT/2, 90
+                label = player.name.upper()
             
             # Write player name
             text = arcade.Text(
-                player.name.upper(),
+                label,
                 x=x, y=y,
                 color=arcade.color.WHITE,
                 font_size=22.5*SCALE, font_name="Courier New",

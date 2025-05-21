@@ -287,7 +287,6 @@ class GameServer:
         is_human_player = any(client.position == self.current_turn for client in self.client_list)
         if not is_human_player:
             self.opponent_bid()
-            self.advance_turn()
             self.broadcast()
 
         
@@ -303,7 +302,6 @@ class GameServer:
             is_human_player = any(client.position == self.current_turn for client in self.client_list)
             if not is_human_player:
                 self.opponent_play()
-                self.advance_turn()
                 self.broadcast()
         
         else:
@@ -504,10 +502,17 @@ class GameServer:
         
         print(f"Player {player_position} played {card_value} of {card_suit}")
         
+        # Get cards on table
+        table = [
+            card for card in self.card_list 
+            if card.location == "table"
+        ]
+        
         # Advance turn
-        self.advance_turn()
-
-    
+        if len(table) < 4:
+            self.advance_turn()
+        else:
+            self.allocate_trick()
             
     def take_trick(self, player_position):
         """Move cards from table to trick stack"""
@@ -725,6 +730,18 @@ class GameServer:
         # Set sound
         self.current_sound = 'play_card'
         
+        # Get cards on table
+        table = [
+            card for card in self.card_list 
+            if card.location == "table"
+        ]
+        
+        # Advance turn
+        if len(table) < 4:
+            self.advance_turn()
+        else:
+            self.allocate_trick()
+        
         
         
     def opponent_bid(self):
@@ -768,9 +785,12 @@ class GameServer:
         # Update bidding history
         bid = Bid(bot.position, bot.bid_type, bot.bid_level, bot.bid_suit)
         self.bidding_history.append(bid)
+        
+        # Advance turn
+        self.advance_turn()
             
             
-
+            
     def deal_cards(self):
         """Distribute cards among players"""
         

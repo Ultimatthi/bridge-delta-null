@@ -250,6 +250,7 @@ class Game(arcade.View):
         
         # Init game state
         self.current_turn = None
+        self.original_turn = None
         self.current_sound = None
         self.contract_suit = None
         self.contract_level = None
@@ -730,7 +731,7 @@ class Game(arcade.View):
                 cursor_type = self.window.CURSOR_HAND
                 
         # Set cursor type to "hand" if hovering card above trick ready to take
-        if len(cards) > 0:
+        if len(cards) > 0 and self.current_turn == self.player_position:
             if len(table) == 4 and cards[-1].location == "table":
                 cursor_type = self.window.CURSOR_HAND
                 
@@ -890,7 +891,7 @@ class Game(arcade.View):
                 card.owner = logical_card["owner"]
                 card.location = logical_card["location"]
                 card.trick = logical_card["trick"]
-        
+
         # Update card position
         self.adjust_card_position()
         
@@ -925,8 +926,16 @@ class Game(arcade.View):
             self.bid_level = None
             self.bid_suit = None
             self.bid_type = None
+            
+        # Order cards in different locations
+        self.arrange_player_cards()
+        self.arrange_table_cards()
+        self.arrange_stack_cards()
+        self.arrange_dummy_cards()
         
-        # Order cards in player's hand
+    def arrange_player_cards(self):
+        """Order cards in player's hand"""
+
         for position in ("south", "north", "west", "east"):
             # Get cards of that hand
             hand = [
@@ -980,11 +989,18 @@ class Game(arcade.View):
                 else:
                     card.facing = "up"
             
+    def arrange_table_cards(self):
+        """Order cards on table"""
+        
+        # Get cards on table
+        table = [card for card in self.card_list if card.location == "table"]
+        
+        # Save opener of turn
+        if len(table) == 0:
+            self.original_turn = self.current_turn
+            return
+        
         # Order cards on table [horizontally]
-        table = [
-            card for card in self.card_list 
-                 if card.location == "table"
-        ]
         for card in table:
             # Get relative board position of that owner (relative to this player)
             rel_owner = self.get_display_position(self.player_position, card.owner)
@@ -1010,16 +1026,21 @@ class Game(arcade.View):
                 pass
                 
         # Order cards on table [vertically]
-        current_index = PLAYER_POSITIONS.index(self.current_turn)
-        # Sort by player position
+        current_index = PLAYER_POSITIONS.index(self.original_turn)  # <== statt self.current_turn
+        # Sort by player position (clockwise from original turn)
         sorted_positions = PLAYER_POSITIONS[current_index:] + PLAYER_POSITIONS[:current_index]
+        # Build sort order dict
         sort_order = {pos: i for i, pos in enumerate(sorted_positions)}
-        table.sort(key=lambda card: sort_order.get(card.owner, 999)) 
-        # Order cards
+        # Sort cards on table accordingly
+        table.sort(key=lambda card: sort_order.get(card.owner, 999))
+        # Update drawing order
         for card in table:
             self.card_list.remove(card)
             self.card_list.append(card)
             
+    def arrange_stack_cards(self):
+        """Order cards in trick stacks"""
+        
         # Order cards on stack
         stack_team = [
             card for card in self.card_list 
@@ -1047,13 +1068,9 @@ class Game(arcade.View):
                         x = board.left + CARD_HEIGHT/2 + batch*26*SCALE
                 y = board.bottom + CARD_WIDTH/2 + 50*SCALE
                 card.position = x, y
-                
-        # Order cards in dummy
-        self.arrange_dummy_hand()
-                
-                
-                
-    def arrange_dummy_hand(self):
+            
+    def arrange_dummy_cards(self):
+        """Order cards in dummy"""
         
         # Get cards in dummy's hand
         dummy_cards = [

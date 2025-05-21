@@ -42,6 +42,7 @@ CARD_VALUES = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 CARD_ENLARGE = 1.1
+HCP = {'A': 4, 'K': 3, 'Q': 2, 'J': 1}
 
 # Light configuration
 LIGHT_RADIUS = SCREEN_WIDTH * 0.9
@@ -69,6 +70,7 @@ class Card(arcade.Sprite):
         self.owner = owner
         self.location = location # deck, table, hand, dummy, tricks
         self.trick = trick
+        self.hcp = HCP.get(value, 0)
 
         # Image to use for the sprite when face up
         self.image = f":resources:images/cards/card{self.suit}{self.value}.png"
@@ -280,13 +282,6 @@ class Game(arcade.View):
             self.player_list.append(player)
               
         # Create board elements: Scoring area
-        image_path = r'assets/images/board.bidding.png'
-        self.board_bidding = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2
-        self.board_bidding.position = x, y
-                
-        # Create board elements: Scoring area
         image_path = r'assets/images/board.scoring.png'
         self.board_scoring = BoardElement(image_path, SCALE)
         x = SCREEN_WIDTH - MARGIN_INNER - self.board_scoring.width/2
@@ -326,8 +321,23 @@ class Game(arcade.View):
         self.board_elements.append(self.board_tricks_lost)
         self.board_elements.append(self.board_texture)
         
+        # Create bidding elements: Circle
+        image_path = r'assets/images/board.bidding.png'
+        self.board_bidding = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH/2
+        y = SCREEN_HEIGHT/2
+        self.board_bidding.position = x, y
+        
+        # Create bidding elements: HCP pad
+        image_path = r'assets/images/hcp.overlay.png'
+        self.hcp_overlay = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH/2
+        y = 30*SCALE
+        self.hcp_overlay.position = x, y
+        
         # Add to bidding element list
         self.bidding_elements.append(self.board_bidding)
+        self.bidding_elements.append(self.hcp_overlay)
         
         # Create buttons: Increase bid
         button_up = Button("assets/images/button.up.png", SCALE, callback=self.increase_bid)
@@ -412,21 +422,6 @@ class Game(arcade.View):
             # Draw board elements
             self.board_elements.draw()
             
-            # Draw bidding elemnts
-            if self.game_phase == "bidding":
-                
-                # Draw bidding field
-                self.bidding_elements.draw()
-                
-                # Draw bidding turn indicator
-                self.bidding_box.draw()
-
-                # Draw buttons
-                self.button_elements.draw()
-                
-                # Annotations
-                self.annotate_bidding()
-            
             # Draw playfield border
             arcade.draw_lrbt_rectangle_outline(
                 left=MARGIN_OUTER,
@@ -442,6 +437,21 @@ class Game(arcade.View):
             
             # Draw the cards
             self.card_list.draw()
+            
+            # Draw bidding elemnts
+            if self.game_phase == "bidding":
+                
+                # Draw bidding field
+                self.bidding_elements.draw()
+                
+                # Draw bidding turn indicator
+                self.bidding_box.draw()
+
+                # Draw buttons
+                self.button_elements.draw()
+                
+                # Annotations
+                self.annotate_bidding()
             
             # Annotations
             self.annotate()
@@ -1068,6 +1078,14 @@ class Game(arcade.View):
                 
             
     def annotate(self):
+        
+        # HCP overlay
+        hcp_count = sum(card.hcp for card in self.card_list if card.owner == self.player_position)
+        label = str(hcp_count) + " HCP"
+        x = self.hcp_overlay.center_x
+        y = self.hcp_overlay.center_y
+        text = self.annotate_text(label, x, y, 0, 18)
+        text.draw()
         
         # Player names
         for player in self.player_list:

@@ -66,7 +66,7 @@ class Card(arcade.Sprite):
         # Attributes
         self.suit = suit
         self.value = value
-        self.facing = facing # up, down
+        self.facing = facing # up, down, wrapped
         self.owner = owner
         self.location = location # deck, table, hand, dummy, tricks
         self.trick = trick
@@ -195,7 +195,7 @@ class Game(arcade.View):
         self.game_phase = "bidding"
         
         # Visibility of last trick
-        self.last_trick_visible = None
+        self.last_trick_visible = False
         
         # Mouse position
         self.mouse_x = 0
@@ -454,48 +454,78 @@ class Game(arcade.View):
             # Annotations
             self.annotate()
             
-            # Card review
-            self.card_review()
-            
         self.light_layer.draw()
         
 
 
-    def card_review(self):
-
-        if self.last_trick_visible:
-            
-            # Tricks
-            tricks = [card for card in self.card_list if card.location == "tricks"]
-            
-            # Check if any tricks
-            if tricks is None:
-                return
-            
-            # Get last trick
-            last_trick = tricks[-4:]
-            
-            # Define mouse offset positions
-            offsets = {
-                "top": (0, 35),
-                "right": (35, 0),
-                "bottom": (0, -35),
-                "left": (-35, 0),
-            }
-                        
-            # Construct review
-            for card in last_trick:
-                # Label
-                value = str(card.value)
-                suit = self.get_suit_symbol(card.suit)
-                label = value + suit
-                # Offset position
-                position = self.get_display_position(self.player_position, card.owner)
-                x, y = offsets[position]
-                # Text object
-                text = self.annotate_text(label, self.mouse_x + x, self.mouse_y + y, 0, 30*SCALE)
-                text.draw()
+    def review_trick(self, held_card):
         
+        # Get cards on trick pile
+        tricks = [card for card in self.card_list if card.location == "tricks"]
+        
+        # Check if any tricks
+        if len(tricks) == 0:
+            return
+        
+        # Check if clicked on last trick
+        if held_card != tricks[-1]:
+            return
+        
+        # Get last trick
+        last_trick = tricks[-4:]
+        
+        # Sort display order
+        position_priority = {"left": 0, "top": 1, "right": 2, "bottom": 3}
+        sorted_last_trick = sorted(
+            last_trick,
+            key=lambda c: position_priority[self.get_display_position(self.player_position, c.owner)]
+        )
+        
+        # Play sound
+        self.play_sound("review_trick")
+
+        if self.last_trick_visible == False:
+            
+            # Turn cards face up and move them radially
+            for card in sorted_last_trick:
+                
+                # Get relative position of card owner
+                rel_position = self.get_display_position(self.player_position, card.owner)
+                
+                # Offset
+                offset_x = 50 * SCALE
+                offset_y = 50 * SCALE
+                
+                # Set new position for radial spread
+                if rel_position == "bottom":
+                    card.center_y -= offset_y
+                    card.angle = 5
+                elif rel_position == "left":
+                    card.center_x -= offset_x
+                    card.angle = -10
+                elif rel_position == "top":
+                    card.center_y += offset_y
+                    card.angle = -5
+                elif rel_position == "right":
+                    card.center_x += offset_x
+                    card.angle = 10
+                            
+                # Pull to top
+                self.pull_to_top(card)
+    
+                # Turn card face up
+                card.facing = "up"
+                
+            self.last_trick_visible = True
+                
+        else:
+            
+            # Turn cards face down and return to original positions
+            self.adjust_card_position()
+                
+            self.last_trick_visible = False
+            
+            
         
     def pull_to_top(self, card: arcade.Sprite):
         """ Pull card to top of rendering order (last to render, looks on-top) """
@@ -523,6 +553,9 @@ class Game(arcade.View):
             # Take trick
             if held_card.location == "table":
                 self.take_trick()
+                
+            if held_card.location == "tricks":
+                self.review_trick(held_card)
                 
         # Execute clicked buttons
         buttons = arcade.get_sprites_at_point((x, y), self.button_elements)
@@ -702,12 +735,10 @@ class Game(arcade.View):
                 cursor_type = self.window.CURSOR_HAND
                 
         # Set cursor type to "cross" if hovering over a card of the last trick taken
-        self.last_trick_visible = False  
         if len(cards) > 0 and len(tricks) > 0:
             if cards[-1] == tricks[-1]:
-                cursor_type = self.window.CURSOR_CROSSHAIR
-                self.last_trick_visible = True
-               
+                cursor_type = self.window.CURSOR_HAND
+                
         # Set cursor
         self.window.set_mouse_cursor(self.window.get_system_mouse_cursor(cursor_type))
                 
@@ -876,6 +907,8 @@ class Game(arcade.View):
             arcade.play_sound(self.sound_slide)
         elif sound == 'take_trick':
             arcade.play_sound(self.sound_cash)
+        elif sound == 'review_trick':
+            arcade.play_sound(self.sound_cash)
         elif sound == 'bid':
             arcade.play_sound(self.sound_drop)
         elif sound == 'lock':
@@ -1002,6 +1035,7 @@ class Game(arcade.View):
         for stack, board in sets:
             for i, card in enumerate(stack):
                 card.angle = 0
+                card.facing = "down"
                 batch = int(np.floor(i/4))
                 if len(stack) <= 20:
                     x = board.left + CARD_HEIGHT/2 + batch*26*SCALE

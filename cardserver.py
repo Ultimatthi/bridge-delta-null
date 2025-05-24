@@ -19,7 +19,7 @@ CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 
 # Notwenidge Spielerzahl
-FULL_TABLE = 1
+FULL_TABLE = 2
 
 # Player positions
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
@@ -124,7 +124,8 @@ class GameServer:
         self.current_game = 0
         self.total_games = 16
         self.vulnerability = "none" # none, both, northsouth, eastwest
-        self.dummy = None
+        self.dummy_position = None
+        self.declarer_position = None
         
         # Sprite list with all the cards
         self.card_list = []
@@ -264,8 +265,9 @@ class GameServer:
                 player for player in self.client_list + self.bot_list
                 if player.position == declarer_bid.player
             )
-            # Set dummy
-            self.dummy = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+2) % 4]
+            # Set dummy and declarer position
+            self.declarer_position = declarer.position
+            self.dummy_position = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+2) % 4]
             # Set game info
             self.game_phase = "playing"
             self.current_turn = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+1) % 4]
@@ -373,7 +375,8 @@ class GameServer:
         self.contract_doubled = "no"
         self.contract_team = None
         self.bidding_history = []
-        self.dummy = None
+        self.dummy_position = None
+        self.declarer_position = None
         
         # Reset bids
         for player in self.client_list + self.bot_list:
@@ -517,10 +520,11 @@ class GameServer:
     def take_trick(self, player_position):
         """Move cards from table to trick stack"""
         
-        # Check if it's this player's turn
-        if player_position != self.current_turn:
-            return
-        
+        # Check if it is player's turn (or player's dummy)
+        if self.current_turn != player_position:
+            if not (self.current_turn == self.dummy_position and player_position == self.declarer_position):
+                return
+                
         # Get cards on table
         table = [card for card in self.card_list if card.location == "table"]
         
@@ -835,7 +839,8 @@ class GameServer:
                 "current_game": self.current_game,
                 "total_games": self.total_games,
                 "vulnerability": self.vulnerability,
-                "dummy": self.dummy
+                "dummy_position": self.dummy_position,
+                "declarer_position": self.declarer_position
             }
             
             # Add card information with appropriate visibility

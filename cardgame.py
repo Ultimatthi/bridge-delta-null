@@ -261,7 +261,8 @@ class Game(arcade.View):
         self.current_game = None
         self.total_games = None
         self.vulnerability = "none"
-        self.dummy = None
+        self.dummy_position = None
+        self.declarer_position = None
         
         # Hovered card
         self.hover_card = None
@@ -735,12 +736,21 @@ class Game(arcade.View):
             if cards[-1].location == "hand" and cards[-1].owner == self.player_position:
                 cursor_type = self.window.CURSOR_HAND
                 
+        # Check if it is player's turn (or player's dummy) to take a trick
+        player_turn = True
+        if self.current_turn != self.player_position:
+            if not (
+                self.current_turn == self.dummy_position 
+                and self.player_position == self.declarer_position
+            ):
+                player_turn = False
+                
         # Set cursor type to "hand" if hovering card above trick ready to take
-        if len(cards) > 0 and self.current_turn == self.player_position:
+        if len(cards) > 0 and player_turn:
             if len(table) == 4 and cards[-1].location == "table":
                 cursor_type = self.window.CURSOR_HAND
                 
-        # Set cursor type to "cross" if hovering over a card of the last trick taken
+        # Set cursor type to "hand" if hovering over a card of the last trick taken
         if len(cards) > 0 and len(tricks) > 0:
             if cards[-1] == tricks[-1]:
                 cursor_type = self.window.CURSOR_HAND
@@ -857,7 +867,8 @@ class Game(arcade.View):
         self.current_game = game_state.get("current_game")
         self.total_games = game_state.get("total_games")
         self.vulnerability = game_state.get("vulnerability")
-        self.dummy = game_state.get("dummy")
+        self.dummy_position = game_state.get("dummy_position")
+        self.declarer_position = game_state.get("declarer_position")
         
         # Play sound
         sound = game_state.get("sound")
@@ -1035,7 +1046,7 @@ class Game(arcade.View):
                 card.position = TABLE_X + CARD_WIDTH*0.6, TABLE_Y
                 card.angle = 40
             # Calculate dummy offset
-            dummy_position = self.get_display_position(self.player_position, self.dummy)
+            dummy_position = self.get_display_position(self.player_position, self.dummy_position)
             if dummy_position == "bottom":
                 card.center_y += CARD_HEIGHT/4
             elif dummy_position == "top":
@@ -1093,7 +1104,7 @@ class Game(arcade.View):
         # Get cards in dummy's hand
         dummy_cards = [
             card for card in self.card_list 
-            if card.owner == self.dummy
+            if card.owner == self.dummy_position
             and card.location == "hand"
         ]
         
@@ -1115,7 +1126,7 @@ class Game(arcade.View):
             # Iterate through each stack
             for card_index, card in enumerate(suit_cards):
                 # Calculate horizontal and vertical position based on suit
-                dummy_position = self.get_display_position(self.player_position, self.dummy)
+                dummy_position = self.get_display_position(self.player_position, self.dummy_position)
                 if dummy_position == "left":
                     x = MARGIN_INNER + (2*suit_index+1)/2*CARD_WIDTH + suit_index*10*SCALE
                     y = SCREEN_HEIGHT/3*2 - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
@@ -1160,7 +1171,7 @@ class Game(arcade.View):
         for player in self.player_list:
             
             # Check if this is the dummy player
-            is_dummy = player.position == self.dummy
+            is_dummy = player.position == self.dummy_position
             
             # Get relative board position
             rel_position = self.get_display_position(self.player_position, player.position)

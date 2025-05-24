@@ -19,7 +19,7 @@ CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 
 # Notwenidge Spielerzahl
-FULL_TABLE = 2
+FULL_TABLE = 1
 
 # Player positions
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
@@ -520,6 +520,10 @@ class GameServer:
     def take_trick(self, player_position):
         """Move cards from table to trick stack"""
         
+        # Check game phase
+        if self.game_phase != "playing":
+            return
+        
         # Check if it is player's turn (or player's dummy)
         if self.current_turn != player_position:
             if not (self.current_turn == self.dummy_position and player_position == self.declarer_position):
@@ -548,6 +552,10 @@ class GameServer:
 
     def lock_bid(self, action, player_position):
         """ Move cards from table to trick stack """
+        
+        # Check game phase
+        if self.game_phase != "bidding":
+            return
         
         # Check if it's this player's turn
         if player_position != self.current_turn:

@@ -636,6 +636,10 @@ class Game(arcade.View):
     def make_bid(self, held_tile):
         """ Check if bid is valid """
         
+        # Check game phase
+        if self.game_phase != "bidding":
+            return
+        
         # Check if it's this player's turn
         if self.player_position != self.current_turn:
             return

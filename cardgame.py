@@ -26,6 +26,7 @@ SCREEN_TITLE = 'Bridge: Card Game'
 # Scaling parameters
 SCALE = min(SCREEN_HEIGHT/1080, SCREEN_WIDTH/1920)
 CARD_SCALE = 1.0 * SCALE
+TILE_SCALE = 1.0 * SCALE
 
 # Layout dimensions
 MARGIN_OUTER = 30 * SCALE
@@ -43,6 +44,10 @@ CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 CARD_ENLARGE = 1.1
 HCP = {'A': 4, 'K': 3, 'Q': 2, 'J': 1}
+
+# Bidding constants
+TILE_LEVELS = [1, 2, 3, 4, 5, 6, 7]
+TILE_SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 
 # Light configuration
 LIGHT_RADIUS = SCREEN_WIDTH * 0.9
@@ -90,8 +95,40 @@ class Card(arcade.Sprite):
         """ Turn card face-up """
         self.texture = arcade.load_texture(self.image)
 
-    
 
+
+class Tile(arcade.Sprite):
+    """ Bid sprite """
+    
+    def __init__(self, suit, level, bid_type, scale):
+        
+        # Attributes
+        self.level = level
+        self.suit = suit
+        self.type = bid_type
+        
+        # Image
+        if bid_type == "normal":
+            self.image = r"assets/images/tile.selection.png"
+        else:
+            self.image = r"assets/images/tile.selection.2.png"
+        
+        # Call the parent
+        super().__init__(self.image, scale, hit_box_algorithm="None")
+     
+        
+        
+class Bid:
+    
+    def __init__(self, player, bid_type, level, suit):
+        
+        self.player = player
+        self.type = bid_type
+        self.level = level
+        self.suit = suit
+        
+        
+        
 class BoardElement(arcade.Sprite):
     """ Sector sprite """
 
@@ -132,34 +169,7 @@ class Player():
         team = team_by_player[position]
         return(team)
 
-        
-        
-class Button(arcade.Sprite):
-    """ Button sprite """
-    
-    def __init__(self, image_path, scale, callback=None):
-        """ Button constructor """
-        
-        # Call the parent
-        super().__init__(image_path, scale)
-        
-        # Attributes
-        self.original_scale = scale
-        self.callback = callback
-        
-    def on_click(self):
-        
-        # Shrink when clicked
-        self.scale = self.original_scale*0.9
-        arcade.schedule(self.reset_scale, 0.2)  # Nach 0.5s zurücksetzen
-        
-        # Callback aufrufen, falls vorhanden
-        if self.callback:
-            self.callback()
-            
-    def reset_scale(self, delta_time):
-        self.scale = self.original_scale
-            
+
 
 # ──[ Game View ]─────────────────────────────────────────────────────────────
 
@@ -197,18 +207,15 @@ class Game(arcade.View):
         # Visibility of last trick
         self.last_trick_visible = False
         
+        # Set bidding history
+        self.bidding_history = []
+        
         # Mouse position
         self.mouse_x = 0
         self.mouse_y = 0
         
         # Set modifier
         self.ctrl_held = False
-        
-        # Dictiionary: Bidding text position
-        position = ["top", "right", "bottom", "left"]
-        x = np.array([210, 370, 210, 50])*SCALE
-        y = np.array([410, 250, 90, 250])*SCALE
-        self.dict_bidding_position = {pos: (x[i], y[i]) for i, pos in enumerate(position)}
         
         # Allocate team
         self.team = self.allocate_team(self.player_position)
@@ -224,29 +231,23 @@ class Game(arcade.View):
         # Sprite list with all the cards, no matter what pile they are in
         self.card_list = arcade.SpriteList()
         
+        # Sprite list with all the tile elements
+        self.tile_list = arcade.SpriteList()
+        
         # Board element list with all the board elements
         self.board_elements = arcade.SpriteList()
         
         # Board element list with all the bidding elements
         self.bidding_elements = arcade.SpriteList()
         
-        # Button element list with all the buttons
-        self.button_elements = arcade.SpriteList()
+        # Board element list with all the texture elements
+        self.texture_elements = arcade.SpriteList()
         
         # Layer to handle light sources
         self.light_layer = LightLayer(SCREEN_WIDTH, SCREEN_HEIGHT)
         
         # Set background of light layer
         self.light_layer.set_background_color(self.background_color)
-        
-        # Box to indicate bidding turn
-        self.bidding_box = arcade.shape_list.ShapeElementList()
-        self.bidding_box.append(
-            arcade.shape_list.create_rectangle_outline(
-            center_x=0, center_y=0, 
-            width=77*SCALE, height=77*SCALE, color=arcade.color.WHITE, 
-            border_width=6*SCALE, tilt_angle=0)
-        )
         
         # Init game state
         self.current_turn = None
@@ -265,6 +266,9 @@ class Game(arcade.View):
         # Hovered card
         self.hover_card = None
         
+        # Hovered tile
+        self.hover_tile = None
+        
         # Thread
         self.running = True
 
@@ -275,6 +279,26 @@ class Game(arcade.View):
                 card.position = SCREEN_WIDTH/2, SCREEN_HEIGHT/2
                 card.angle = random.uniform(-5, 5)
                 self.card_list.append(card)
+                
+        # Create every normal tile
+        for i, tile_suit in enumerate(TILE_SUITS):
+            for j, tile_level in enumerate(TILE_LEVELS):
+                tile = Tile(tile_suit, tile_level, "normal", TILE_SCALE)
+                tile.center_x = SCREEN_WIDTH / 2 - 150*SCALE + i * 75*SCALE
+                tile.center_y = SCREEN_HEIGHT / 2 - 95*SCALE + j * 50*SCALE
+                self.tile_list.append(tile)
+                
+        # Create pass tile
+        tile = Tile(None, None, "pass", TILE_SCALE)
+        tile.center_x = SCREEN_WIDTH / 2 - 112.5*SCALE
+        tile.center_y = SCREEN_HEIGHT / 2 - 145*SCALE
+        self.tile_list.append(tile)  
+        
+        # Create double tile
+        tile = Tile(None, None, "double", TILE_SCALE)
+        tile.center_x = SCREEN_WIDTH / 2 + 112.5*SCALE
+        tile.center_y = SCREEN_HEIGHT / 2 - 145*SCALE
+        self.tile_list.append(tile)  
         
         # Create every player
         for position in PLAYER_POSITIONS:
@@ -316,26 +340,54 @@ class Game(arcade.View):
         x = MARGIN_INNER + self.board_tricks_lost.width/2
         y = MARGIN_INNER + self.board_tricks_lost.height/2
         self.board_tricks_lost.position = x, y
-        
-        # Create board element: Texture
-        image_path =  r'assets/images/board.texture.png'
-        self.board_texture = BoardElement(image_path, SCALE)
-        self.board_texture.position = SCREEN_WIDTH/2, SCREEN_HEIGHT/2
-        
+          
         # Add to board element list
         self.board_elements.append(self.board_border)
         self.board_elements.append(self.board_scoring)
         self.board_elements.append(self.board_contract)
         self.board_elements.append(self.board_tricks_won)
         self.board_elements.append(self.board_tricks_lost)
-        self.board_elements.append(self.board_texture)
         
-        # Create bidding elements: Circle
-        image_path = r'assets/images/board.bidding.png'
-        self.board_bidding = BoardElement(image_path, SCALE)
+        # Create texture element: Texture
+        image_path =  r'assets/images/board.texture.png'
+        self.board_texture = BoardElement(image_path, SCALE)
+        self.board_texture.position = SCREEN_WIDTH/2, SCREEN_HEIGHT/2
+        self.texture_elements.append(self.board_texture)
+        
+        # Create bidding elements: Grid
+        image_path = r'assets/images/bidding.grid.png'
+        self.bidding_grid = BoardElement(image_path, SCALE)
         x = SCREEN_WIDTH/2
+        y = SCREEN_HEIGHT/2 + 30*SCALE
+        self.bidding_grid.position = x, y
+        
+        # Create bidding elements: Strips
+        image_path = r'assets/images/bidding.strip.png'
+        self.bidding_strip_bottom = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH/2
+        y = SCREEN_HEIGHT/2 - 272*SCALE
+        self.bidding_strip_bottom.position = x, y
+        
+        # Create bidding elements: Strips
+        image_path = r'assets/images/bidding.strip.png'
+        self.bidding_strip_top = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH/2
+        y = SCREEN_HEIGHT/2 + 340*SCALE
+        self.bidding_strip_top.position = x, y
+        
+        # Create bidding elements: Strips
+        image_path = r'assets/images/bidding.strip.png'
+        self.bidding_strip_left = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH/2 - 580*SCALE
         y = SCREEN_HEIGHT/2
-        self.board_bidding.position = x, y
+        self.bidding_strip_left.position = x, y
+        
+        # Create bidding elements: Strips
+        image_path = r'assets/images/bidding.strip.png'
+        self.bidding_strip_right = BoardElement(image_path, SCALE)
+        x = SCREEN_WIDTH/2 + 580*SCALE
+        y = SCREEN_HEIGHT/2
+        self.bidding_strip_right.position = x, y
         
         # Create bidding elements: HCP pad
         image_path = r'assets/images/hcp.overlay.png'
@@ -345,29 +397,13 @@ class Game(arcade.View):
         self.hcp_overlay.position = x, y
         
         # Add to bidding element list
-        self.bidding_elements.append(self.board_bidding)
+        self.bidding_elements.append(self.bidding_grid)
         self.bidding_elements.append(self.hcp_overlay)
-        
-        # Create buttons: Increase bid
-        button_up = Button("assets/images/button.up.png", SCALE, callback=self.increase_bid)
-        button_up.center_x = self.board_bidding.left + 210*SCALE
-        button_up.center_y = self.board_bidding.bottom + 160*SCALE
-        
-        # Create buttons: Decrease bid
-        button_down = Button("assets/images/button.down.png", SCALE, callback=self.decrease_bid)
-        button_down.center_x = self.board_bidding.left + 210*SCALE
-        button_down.center_y = self.board_bidding.bottom + 20*SCALE
-        
-        # Create buttons: Lock bid
-        button_lock = Button("assets/images/button.lock.png", SCALE, callback=self.lock_bid)
-        button_lock.center_x = self.board_bidding.left + 280*SCALE
-        button_lock.center_y = self.board_bidding.bottom + 70*SCALE
-        
-        # Add to button list
-        self.button_elements.append(button_up)
-        self.button_elements.append(button_down)
-        self.button_elements.append(button_lock)
-        
+        self.bidding_elements.append(self.bidding_strip_bottom)
+        self.bidding_elements.append(self.bidding_strip_top)
+        self.bidding_elements.append(self.bidding_strip_left)
+        self.bidding_elements.append(self.bidding_strip_right)
+
         # Create main light source
         self.center_light = Light(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                              radius=LIGHT_RADIUS,
@@ -418,8 +454,26 @@ class Game(arcade.View):
             else:
                 card.face_up()
                 
+        # Reset highlighted tile
+        for tile in self.tile_list:
+            if tile != self.hover_tile:
+                tile.color = [255, 255, 255, 0]
+                
+        # Highlight tile we are hovering above
+        if (self.hover_tile != None):
+            self.hover_tile.color = [255, 255, 255, 80]
+            
+        # Get ordinal of current contract
+        contract_ordinal = self.get_bid_ordinal(self.contract_level, self.contract_suit)
+        
+        # Grey out tile that are no longer biddable
+        for tile in self.tile_list:
+            bid_ordinal = self.get_bid_ordinal(tile.level, tile.suit)
+            if bid_ordinal <= contract_ordinal and tile.type == "normal":
+                tile.color = arcade.color.ARSENIC
         
                 
+        
     def on_draw(self):
         """ Render the screen. """
         
@@ -437,23 +491,23 @@ class Game(arcade.View):
             # Draw the cards
             self.card_list.draw()
             
-            # Draw bidding elemnts
+            # Draw bidding elements
             if self.game_phase == "bidding":
                 
-                # Draw bidding field
+                # Draw bidding elements
                 self.bidding_elements.draw()
                 
-                # Draw bidding turn indicator
-                self.bidding_box.draw()
-
-                # Draw buttons
-                self.button_elements.draw()
+                # Draw bidding tiles
+                self.tile_list.draw()
                 
                 # Annotations
                 self.annotate_bidding()
             
             # Annotations
             self.annotate()
+            
+            # Texture overlay
+            self.texture_elements.draw()
             
         self.light_layer.draw()
         
@@ -558,107 +612,56 @@ class Game(arcade.View):
             if held_card.location == "tricks":
                 self.review_trick(held_card)
                 
-        # Execute clicked buttons
-        buttons = arcade.get_sprites_at_point((x, y), self.button_elements)
-        for button_sprite in buttons:
-            button_sprite.on_click()
+        # Get list of tiles we've clicked on
+        tiles = arcade.get_sprites_at_point((x, y), self.tile_list)
+        
+        # Have we clicked on a card?
+        if len(tiles) > 0:
             
+            # Might be a stack of cards, get the top one
+            held_tile = tiles[-1]
+            
+            self.make_bid(held_tile)
+
             
                 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
         """ Called when the user scrolls the mouse wheel. """
                 
-        # Number of repetitions
-        repeat = 5 if self.ctrl_held else 1
-
-        if scroll_y > 0:
-            for _ in range(repeat):
-                self.increase_bid()
-        elif scroll_y < 0:
-            for _ in range(repeat):
-                self.decrease_bid()
+        pass
 
 
 
-    def increase_bid(self):
-        """ Increases bid by one unit """
+    def make_bid(self, held_tile):
+        """ Check if bid is valid """
         
         # Check if it's this player's turn
         if self.player_position != self.current_turn:
             return
         
-        # Already at max level
-        if self.bid_level == 7 and self.bid_suit == "notrump":
+        # Check if doubling is allowed
+        if ((self.contract_doubled == "yes" or 
+             self.contract_team == self.team or 
+             len(self.bidding_history) < 1) and 
+            held_tile.type == "double"):
             return
-        
-        # Play sound
-        self.play_sound("bid")
-        
+                
         # Get ordinal (strictly increasing) number of bid and current highest bid (contract)
-        bid_ordinal = self.get_bid_ordinal(self.bid_level, self.bid_suit)
+        bid_ordinal = self.get_bid_ordinal(held_tile.level, held_tile.suit)
         contract_ordinal = self.get_bid_ordinal(self.contract_level, self.contract_suit)
         
-        # First bid in a game
-        if self.bid_type is None:
-            self.bid_level = 0
-            self.bid_suit = "notrump"
-            self.bid_type = "pass"
+        # Check if bid is higher than current contract
+        if bid_ordinal < contract_ordinal and held_tile.type == "normal":
             return
+        
+        # Set bid
+        self.bid_level = held_tile.level
+        self.bid_suit = held_tile.suit
+        self.bid_type = held_tile.type
             
-        # First bid in a player's turn
-        if bid_ordinal < contract_ordinal:
-            self.bid_level = self.contract_level
-            self.bid_suit = self.contract_suit
-            self.bid_type = "pass"
-            return
-        
-        # Navigate throuth bid types
-        if self.bid_type != "normal":
-            index = BID_TYPES.index(self.bid_type)
-            self.bid_type = BID_TYPES[index + 1]
-        
-        # Increase bid if bid type is normal
-        if self.bid_type == "normal":
-            index = (SUITS.index(self.bid_suit) + 1) % 5
-            self.bid_level += (index==0)
-            self.bid_suit = SUITS[index]
-        
+        # Lock bid
+        self.lock_bid()
             
-
-    def decrease_bid(self):
-        """ Decreases bid by one unit """
-        
-        # Check if it's this player's turn
-        if self.player_position != self.current_turn:
-            return
-        
-        # Player first must increase bid
-        if self.bid_level is None:
-            return
-        
-        # Cannot go below pass
-        if self.bid_type == "pass":
-            return
-        
-        # Play sound
-        self.play_sound("bid")
-        
-        # Get ordinal (strictly increasing) number of bid and current highest bid (contract)
-        bid_ordinal = self.get_bid_ordinal(self.bid_level, self.bid_suit)
-        contract_ordinal = self.get_bid_ordinal(self.contract_level, self.contract_suit)
-        
-        # Decrease bid if type is normal
-        if self.bid_type == "normal":
-            index = (SUITS.index(self.bid_suit) - 1) % 5
-            self.bid_level -= (index==4)
-            self.bid_suit = SUITS[index]
-
-        # Navigate through bid types
-        if self.bid_level == 0 or bid_ordinal-1 <= contract_ordinal:
-            index = BID_TYPES.index(self.bid_type)
-            self.bid_type = BID_TYPES[index -1]
-
-        
 
     def lock_bid(self):
         
@@ -715,15 +718,17 @@ class Game(arcade.View):
         else:
             self.hover_card = None
             
-        # Get list of buttons we'are hovering above
-        buttons = arcade.get_sprites_at_point((x, y), self.button_elements)
+        # Get list of tiles we'are hovering above
+        tiles = arcade.get_sprites_at_point((x, y), self.tile_list)
+        
+        # Declare top tile as hovered tile
+        if len(tiles) > 0:
+            self.hover_tile = tiles[-1]
+        else:
+            self.hover_tile = None
         
         # Set cursor type to default
         cursor_type = self.window.CURSOR_DEFAULT
-        
-        # Set cursor type to "hand" if hovering above button
-        if buttons:
-            cursor_type = self.window.CURSOR_HAND
                 
         # Set cursor type to "hand" if hovering card above hand card
         if len(cards) > 0:
@@ -899,8 +904,21 @@ class Game(arcade.View):
         hand_count = sum(1 for card in self.card_list if card.location == "hand")
         if hand_count == 52:
             self.order_hand()
-
-
+            
+        # Clear bidding history
+        self.bidding_history.clear()
+        
+        # Refill bidding history
+        for bid_info in game_state["bidding_history"]:
+            bid = Bid(
+                player=bid_info["player"],
+                bid_type=bid_info["type"],
+                level=bid_info["level"],
+                suit=bid_info["suit"]
+            )
+            self.bidding_history.append(bid)
+            
+            
 
     def play_sound(self, sound):
         
@@ -1226,54 +1244,80 @@ class Game(arcade.View):
         
         
     def annotate_bidding(self):
-        
-        # Sync client data with player_list data
-        player = next(player for player in self.player_list 
-                    if player.position == self.player_position)
-        player.bid_level = self.bid_level
-        player.bid_suit = self.bid_suit
-        player.bid_type = self.bid_type
-        
+            
         # Bidding text
         for player in self.player_list:
+            
+            # Init 3 diffently colored texts that are stacked to one single text later
+            label_white = ""
+            label_red = ""
+            label_beige = ""
+            
+            # Create text for each player
+            for bid in self.bidding_history:
+                if bid.player == player.position:
+                    symbol = self.convert_bid_to_symbol(bid)
+                    
+                    # Add delimiter
+                    if label_white + label_red + label_beige != "":
+                        label_white += "·"
+                        label_red += " "
+                        label_beige += " "
+            
+                    # Add symbol
+                    if bid.suit in ["clubs", "spades"] or bid.type == "pass":
+                        label_white += symbol
+                        label_red += " " * len(symbol)
+                        label_beige += " " * len(symbol)
+                    elif bid.suit in ["diamonds", "hearts"] or bid.type == "double":
+                        label_white += " " * len(symbol)
+                        label_red += symbol
+                        label_beige += " " * len(symbol)
+                    else:
+                        label_white += " " * len(symbol)
+                        label_red += " " * len(symbol)
+                        label_beige += symbol
+                    
             # Get relative board position
             rel_position = self.get_display_position(self.player_position, player.position)
             # Set bidding location
-            x_rel, y_rel = self.dict_bidding_position[rel_position]
-            x = self.board_bidding.left + x_rel
-            y = self.board_bidding.bottom + y_rel
+            if rel_position == "bottom":
+                x = self.bidding_strip_bottom.center_x
+                y = self.bidding_strip_bottom.center_y
+            elif rel_position == "top":
+                x = self.bidding_strip_top.center_x
+                y = self.bidding_strip_top.center_y
+            elif rel_position == "left":
+                x = self.bidding_strip_left.center_x
+                y = self.bidding_strip_left.center_y
+            elif rel_position == "right":
+                x = self.bidding_strip_right.center_x
+                y = self.bidding_strip_right.center_y
             # Draw bidding text
-            text = self.annotate_bid_text(player.bid_level, player.bid_suit,
-                                          player.bid_type, x, y, 0, 30)
-            text.draw()
-            # Set bidding box
-            if player.position == self.current_turn:
-                self.bidding_box.position = (x, y)
-        
+            text_white = self.annotate_text(label_white, x, y, 0, 30, [255, 255, 255])
+            text_red = self.annotate_text(label_red, x, y, 0, 30, [173, 54, 50])
+            text_beige = self.annotate_text(label_beige, x, y, 0, 30, [255, 204, 170])
+            text_white.draw()
+            text_red.draw()
+            text_beige.draw()
+
 
             
-    def annotate_bid_text(self, bid_level, bid_suit, bid_type, x, y, angle, size):
+    def convert_bid_to_symbol(self, bid):
         
         # Transform bid to string
-        if bid_type is None:
-            label = ""
-        elif bid_type == "pass":
-            label = "P"
-        elif bid_type == "double":
-            label = "X"
+        if bid.type is None:
+            symbol = ""
+        elif bid.type == "pass":
+            symbol = "P"
+        elif bid.type == "double":
+            symbol = "X"
         else:
-            suit_symbol = self.get_suit_symbol(bid_suit)
-            label = f"{bid_level}{suit_symbol}"
-            
-        # Reduce size of NT bid
-        if bid_suit == "notrump" and bid_type == "normal":
-            size = size*0.8
-            
-        # Text object
-        text = self.annotate_text(label, x, y, angle, size)
+            suit_symbol = self.get_suit_symbol(bid.suit)
+            symbol = f"{bid.level}{suit_symbol}"
         
         # Return
-        return(text)
+        return(symbol)
     
     
     
@@ -1309,7 +1353,7 @@ class Game(arcade.View):
     
     
       
-    def annotate_text(self, label, x, y, angle, size):
+    def annotate_text(self, label, x, y, angle, size, color=arcade.color.WHITE):
         
         # Set to "" if None
         label = "" if label is None else label
@@ -1327,7 +1371,7 @@ class Game(arcade.View):
         text = arcade.Text(
             label.upper(),
             x=x, y=y,
-            color=arcade.color.WHITE,
+            color=color,
             font_size=size*SCALE, font_name="Courier New",
             anchor_x="center", anchor_y="center",
             align="center", rotation=angle

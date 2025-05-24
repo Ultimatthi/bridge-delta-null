@@ -1,0 +1,7 @@
+python -m nuitka cardgame.py ^
+  --standalone ^
+  --follow-imports ^
+  --include-data-dir=assets=assets ^
+  --windows-icon-from-ico=icon_app.ico ^
+  --windows-force-stderr-spec=logs.txt ^
+  --windows-force-stdout-spec=output.txt

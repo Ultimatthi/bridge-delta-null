@@ -823,6 +823,7 @@ class GameServer:
             game_state = {
                 "cards": [],
                 "players": [],
+                "bidding_history": [],
                 "game_phase": self.game_phase,
                 "current_turn": self.current_turn,
                 "sound": self.current_sound,
@@ -848,6 +849,17 @@ class GameServer:
                     "trick": card.trick
                 }
                 game_state["cards"].append(card_info)
+                
+            # Add bidding history
+            for bid in self.bidding_history:
+                bid_info = {
+                    "player": bid.player,
+                    "type": bid.type,
+                    "level": bid.level,
+                    "suit": bid.suit,
+                    "team": bid.team
+                }
+                game_state["bidding_history"].append(bid_info)
                 
             # Add player info
             for player in self.client_list + self.bot_list:

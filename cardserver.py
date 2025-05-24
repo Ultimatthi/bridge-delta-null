@@ -170,6 +170,19 @@ class GameServer:
                     player_name = player_data.get("player_name")
                     print(f"Connection accepted from {addr} with username {player_name}")
                     
+                    print(player_position)
+                    
+                    # Dodge position if already taken
+                    player_position = self.assign_player_position(player_position)
+                    
+                    print(player_position)
+                    
+                    # Decline if table is full
+                    if player_position is None:
+                        continue
+                    
+                    print(player_position)
+                    
                     # Add to client list
                     client = Client(c, player_name, player_position)
                     self.client_list.append(client)
@@ -195,6 +208,25 @@ class GameServer:
         finally:
             s.close()
             print('Server closed')
+
+
+
+    def assign_player_position(self, player_position):
+        """ Assign available board position """
+        
+        # Find taken positions
+        taken = {client.position for client in self.client_list}
+        
+        # Find available positions
+        available = [pos for pos in PLAYER_POSITIONS if pos not in taken]
+
+        # Assign position
+        if player_position in available:
+            return player_position
+        elif available:
+            return random.choice(available)
+        else:
+            return None
 
 
 

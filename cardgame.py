@@ -16,7 +16,7 @@ import pyperclip
 # ──[ Parameters ]─────────────────────────────────────────────────────────────
 
 # Set consistent random seed
-random.seed(42)
+# random.seed(42)
 
 # Window dimensions
 SCREEN_WIDTH = 1600
@@ -292,13 +292,13 @@ class Game(arcade.View):
         # Create pass tile
         tile = Tile(None, None, "pass", TILE_SCALE)
         tile.center_x = SCREEN_WIDTH / 2 - 112.5*SCALE
-        tile.center_y = SCREEN_HEIGHT / 2 - 145*SCALE
+        tile.center_y = SCREEN_HEIGHT / 2 - 135*SCALE
         self.tile_list.append(tile)  
         
         # Create double tile
         tile = Tile(None, None, "double", TILE_SCALE)
         tile.center_x = SCREEN_WIDTH / 2 + 112.5*SCALE
-        tile.center_y = SCREEN_HEIGHT / 2 - 145*SCALE
+        tile.center_y = SCREEN_HEIGHT / 2 - 135*SCALE
         self.tile_list.append(tile)  
         
         # Create every player
@@ -1635,6 +1635,10 @@ class MenuView(arcade.View):
                 if toggle.value:
                     selected_position = position
                     break
+                
+            # Randomly pick a position if toggle says so
+            if selected_position == "random":
+                selected_position = random.choice(PLAYER_POSITIONS)
             
             # Create main view with the user inputs
             main_view = Game(

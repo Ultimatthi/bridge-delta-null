@@ -286,7 +286,7 @@ class Game(arcade.View):
             for j, tile_level in enumerate(TILE_LEVELS):
                 tile = Tile(tile_suit, tile_level, "normal", TILE_SCALE)
                 tile.center_x = SCREEN_WIDTH / 2 - 150*SCALE + i * 75*SCALE
-                tile.center_y = SCREEN_HEIGHT / 2 - 95*SCALE + j * 50*SCALE
+                tile.center_y = SCREEN_HEIGHT / 2 - 85*SCALE + j * 50*SCALE
                 self.tile_list.append(tile)
                 
         # Create pass tile
@@ -359,34 +359,34 @@ class Game(arcade.View):
         image_path = r'assets/images/bidding.grid.png'
         self.bidding_grid = BoardElement(image_path, SCALE)
         x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2 + 30*SCALE
+        y = SCREEN_HEIGHT/2 + 40*SCALE
         self.bidding_grid.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
         self.bidding_strip_bottom = BoardElement(image_path, SCALE)
         x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2 - 272*SCALE
+        y = SCREEN_HEIGHT/2 - 260*SCALE
         self.bidding_strip_bottom.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
         self.bidding_strip_top = BoardElement(image_path, SCALE)
         x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2 + 340*SCALE
+        y = SCREEN_HEIGHT/2 + 330*SCALE
         self.bidding_strip_top.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
         self.bidding_strip_left = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2 - 580*SCALE
+        x = SCREEN_WIDTH/2 - 530*SCALE
         y = SCREEN_HEIGHT/2
         self.bidding_strip_left.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
         self.bidding_strip_right = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2 + 580*SCALE
+        x = SCREEN_WIDTH/2 + 530*SCALE
         y = SCREEN_HEIGHT/2
         self.bidding_strip_right.position = x, y
         

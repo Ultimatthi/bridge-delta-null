@@ -1463,6 +1463,7 @@ class MenuView(arcade.View):
     def __init__(self):
         super().__init__()
         self.toggle_list = []
+        self.input_list = []
         
         # Load assets
         self.load_assets()
@@ -1523,7 +1524,7 @@ class MenuView(arcade.View):
         """Create all UI elements."""
         self.manager = arcade.gui.UIManager()
         
-        # Create text input fields
+        # Create text input fields: 1
         self.username_widget = arcade.gui.UIInputText(
             text="Icarus",
             height=35 * LOBBY_SCALE, 
@@ -1533,7 +1534,9 @@ class MenuView(arcade.View):
             border_width=0,
             style={state: self.input_style for state in ["normal", "hover", "focus", "press", "disabled", "invalid"]}
         )
+        self.input_list.append(self.username_widget)
         
+        # Create text input fields: 2
         self.server_widget = arcade.gui.UIInputText(
             text="localhost:55556",
             height=35 * LOBBY_SCALE, 
@@ -1543,6 +1546,7 @@ class MenuView(arcade.View):
             border_width=0,
             style={state: self.input_style for state in ["normal", "hover", "focus", "press", "disabled", "invalid"]}
         )
+        self.input_list.append(self.server_widget)
         
         # Create launch button
         self.launch_widget = arcade.gui.UITextureButton(
@@ -1575,6 +1579,9 @@ class MenuView(arcade.View):
             
             # Store references to specific toggles for positioning later
             setattr(self, f"{position}_widget", toggle)
+            
+        # Set "random" toggle to default
+        self.toggle_list[4].value = True
 
     def position_ui_elements(self):
         """Position all UI elements on the screen."""
@@ -1662,6 +1669,14 @@ class MenuView(arcade.View):
                         other.value = False
                 
                 arcade.play_sound(self.sound_drop)
+               
+        # Text input events - only one can be selected at a time
+        for widget in self.input_list:
+            @widget.event("on_click")
+            def handle_input(event, widget=widget):
+                for other in self.input_list:
+                    if other != widget:
+                        other.deactivate()
 
     def on_show_view(self):
         """Called when this view becomes active."""
@@ -1686,15 +1701,29 @@ class MenuView(arcade.View):
         """Handle key presses, especially for clipboard operations."""
         # Handle Ctrl+V (paste)
         if key == arcade.key.V and modifiers & arcade.key.MOD_CTRL:
+            
+            # Get copied text
             clipboard_text = pyperclip.paste()
             
-            # Add text to the active input field
-            if self.username_widget.active:
-                self.username_widget.text += clipboard_text
-            elif self.server_widget.active:
-                self.server_widget.text += clipboard_text
+            # Add text in active widget
+            for widget in self.input_list:
+                if widget.active:
+                    cursor_pos = widget.caret.position
+                    current_text = widget.text
+                    new_text = current_text[:cursor_pos] + clipboard_text + current_text[cursor_pos:]
+                    widget.text = new_text
+                    widget.caret.position = cursor_pos + len(clipboard_text)
+                    
+        # Handle Ctrl+A (select all)
+        elif key == arcade.key.A and modifiers & arcade.key.MOD_CTRL:
             
-        
+            # Select text in active widget
+            for widget in self.input_list:
+                if widget.active:
+                    widget.caret.mark = 0
+                    widget.caret.position = len(widget.text)
+                     
+            
 
 # ──[ Main ]───────────────────────────────────────────────────────────────────
 

@@ -14,3 +14,6 @@
 
 # scoring:
 - show scoring report
+
+# get available attributes of an object:
+- print("Available attributes:", [attr for attr in dir(self.object)])

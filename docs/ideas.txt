@@ -2,15 +2,24 @@
 - replace "_elements" with "_list"
 - remove unused functions and variables
 - use PEP8 format style
+- replace northsouth/eastwest with we/they
 
 # drawing:
 - set line stroke to 2 px
+- fix light texture effect on beige color
+- fix dummy name before first card is played
 
 # connection
 - fix data transfer when rejoining
+- remove silently disconnected clients
 
-# lobby:
-- set up a lobby
+# bidding
+- reduce grid saturation if not player's turn
+
+# lobby
+- screen resolution widget
+- "save as default" button
+- do not trigger "ESC" with active modifier "CTRL"
 
 # scoring:
 - show scoring report

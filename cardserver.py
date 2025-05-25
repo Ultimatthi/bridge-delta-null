@@ -19,7 +19,7 @@ CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 
 # Notwenidge Spielerzahl
-FULL_TABLE = 2
+FULL_TABLE = 1
 
 # Player positions
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
@@ -646,6 +646,9 @@ class GameServer:
         # Update bidding history
         bid = Bid(client.position, bid_type, bid_level, bid_suit)
         self.bidding_history.append(bid)
+        
+        # Set sound
+        self.current_sound = 'bid'
         
         # Advance turn
         self.advance_turn()

@@ -1170,12 +1170,15 @@ class Game(arcade.View):
             y = self.hcp_overlay.center_y
             text = self.annotate_text(label, x, y, 0, 18)
             text.draw()
+            
+        # Number of cards in hands
+        hand_cards = sum(1 for card in self.card_list if card.location == "hand")
         
         # Player names
         for player in self.player_list:
             
             # Check if this is the dummy player
-            is_dummy = player.position == self.dummy_position
+            is_dummy = player.position == self.dummy_position and hand_cards < 52
             
             # Get relative board position
             rel_position = self.get_display_position(self.player_position, player.position)

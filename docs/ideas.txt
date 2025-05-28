@@ -16,6 +16,9 @@
 # bidding
 - reduce grid saturation if not player's turn
 
+# playing
+- add 1 s lag for bot play
+
 # lobby
 - screen resolution widget
 - "save as default" button
@@ -26,3 +29,6 @@
 
 # get available attributes of an object:
 - print("Available attributes:", [attr for attr in dir(self.object)])
+
+# GitHub
+- add visual previews

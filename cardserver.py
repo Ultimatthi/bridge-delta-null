@@ -30,6 +30,7 @@ SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 # Logic parameters
 IDLE_TIME_PLAY = 0.5
 IDLE_TIME_TRICK = 1.0
+IDLE_TIME_PHASE = 1.0
 FPS = 20
 
 
@@ -301,6 +302,7 @@ class GameServer:
             self.declarer_position = declarer.position
             self.dummy_position = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+2) % 4]
             # Set game info
+            time.sleep(IDLE_TIME_PHASE)
             self.game_phase = "playing"
             self.current_turn = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+1) % 4]
             self.broadcast()

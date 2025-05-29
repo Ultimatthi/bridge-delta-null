@@ -18,49 +18,48 @@ import pyperclip
 # Set consistent random seed
 # random.seed(42)
 
-# Window dimensions
-SCREEN_WIDTH = 1600
-SCREEN_HEIGHT = 900
-SCREEN_TITLE = 'Bridge: Card Game'
-
-# Scaling parameters
-SCALE = min(SCREEN_HEIGHT/1080, SCREEN_WIDTH/1920)
-CARD_SCALE = 1.0 * SCALE
-TILE_SCALE = 1.0 * SCALE
-
-# Layout dimensions
-MARGIN_OUTER = 30 * SCALE
-MARGIN_INNER = 60 * SCALE
-TABLE_X = SCREEN_WIDTH / 2
-TABLE_Y = SCREEN_HEIGHT / 2
-
 # Game constants
+SCREEN_TITLE = 'Bridge: Card Game'
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
-BID_TYPES = ["pass", "double", "normal"]
-CARD_WIDTH = 140 * CARD_SCALE
-CARD_HEIGHT = 190 * CARD_SCALE
-CARD_VALUES = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]
-CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
-CARD_ENLARGE = 1.1
 HCP = {'A': 4, 'K': 3, 'Q': 2, 'J': 1}
 
+# Card constants
+CARD_VALUES = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]
+CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
+CARD_ENLARGE = 1.1
+
 # Bidding constants
+BID_TYPES = ["pass", "double", "normal"]
 TILE_LEVELS = [1, 2, 3, 4, 5, 6, 7]
 TILE_SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
-
-# Light configuration
-LIGHT_RADIUS = SCREEN_WIDTH * 0.9
 
 # Lobby dimensions
 LOBBY_WIDTH = 1280
 LOBBY_HEIGHT = 720
 LOBBY_TITLE = "Bridge: Lobby"
-
-# Lobby scaling paramters
 LOBBY_SCALE = min(LOBBY_HEIGHT/1080, LOBBY_WIDTH/1920)
 
 # ──[ Classes ]────────────────────────────────────────────────────────────────
+
+class Layout:
+    """ Layout variables """
+    
+    def __init__(self, width: int, height: int):
+        self.update(width, height)
+
+    def update(self, width: int, height: int):
+        
+        resize = min(height / 1080, width / 1920)
+        
+        self.width = width
+        self.height = height
+        self.scale = resize
+        self.light_radius = width * 0.8
+        self.card_width = 140 * resize
+        self.card_height = 190 * resize
+
+
 
 class Card(arcade.Sprite):
     """ Card sprite """
@@ -115,8 +114,20 @@ class Tile(arcade.Sprite):
         
         # Call the parent
         super().__init__(self.image, scale, hit_box_algorithm="None")
-     
         
+    def set_position_by_index(self, i, j, layout):
+
+        if self.type == "normal":
+            self.center_x = layout.width / 2 - 150 * layout.scale + i * 75 * layout.scale
+            self.center_y = layout.height / 2 - 85 * layout.scale + j * 50 * layout.scale
+        elif self.type == "pass":
+            self.center_x = layout.width / 2 - 112.5*layout.scale
+            self.center_y = layout.height / 2 - 135*layout.scale
+        elif self.type == "double":
+            self.center_x = layout.width / 2 + 112.5*layout.scale
+            self.center_y = layout.height / 2 - 135*layout.scale
+
+
         
 class Bid:
     
@@ -198,6 +209,9 @@ class Game(arcade.View):
         # Fonts
         arcade.load_font("assets/fonts/CourierNewBold.ttf")
         
+        # Layout
+        self.layout = Layout(1600, 900)
+        
     def setup(self):
         """ Set up the game here. Call this function to restart the game. """
         
@@ -244,7 +258,7 @@ class Game(arcade.View):
         self.texture_elements = arcade.SpriteList()
         
         # Layer to handle light sources
-        self.light_layer = LightLayer(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.light_layer = LightLayer(self.layout.width, self.layout.height)
         
         # Set background of light layer
         self.light_layer.set_background_color(self.background_color)
@@ -276,29 +290,26 @@ class Game(arcade.View):
         # Create every card
         for card_suit in CARD_SUITS:
             for card_value in CARD_VALUES:
-                card = Card(card_suit, card_value, "up", None, None, CARD_SCALE)
-                card.position = SCREEN_WIDTH/2, SCREEN_HEIGHT/2
+                card = Card(card_suit, card_value, "up", None, None, self.layout.scale)
+                card.position = self.layout.width/2, self.layout.height/2
                 card.angle = random.uniform(-5, 5)
                 self.card_list.append(card)
                 
         # Create every normal tile
         for i, tile_suit in enumerate(TILE_SUITS):
             for j, tile_level in enumerate(TILE_LEVELS):
-                tile = Tile(tile_suit, tile_level, "normal", TILE_SCALE)
-                tile.center_x = SCREEN_WIDTH / 2 - 150*SCALE + i * 75*SCALE
-                tile.center_y = SCREEN_HEIGHT / 2 - 85*SCALE + j * 50*SCALE
+                tile = Tile(tile_suit, tile_level, "normal", self.layout.scale)
+                tile.set_position_by_index(i, j, self.layout)
                 self.tile_list.append(tile)
                 
         # Create pass tile
-        tile = Tile(None, None, "pass", TILE_SCALE)
-        tile.center_x = SCREEN_WIDTH / 2 - 112.5*SCALE
-        tile.center_y = SCREEN_HEIGHT / 2 - 135*SCALE
+        tile = Tile(None, None, "pass", self.layout.scale)
+        tile.set_position_by_index(0, 0, self.layout)
         self.tile_list.append(tile)  
         
         # Create double tile
-        tile = Tile(None, None, "double", TILE_SCALE)
-        tile.center_x = SCREEN_WIDTH / 2 + 112.5*SCALE
-        tile.center_y = SCREEN_HEIGHT / 2 - 135*SCALE
+        tile = Tile(None, None, "double", self.layout.scale)
+        tile.set_position_by_index(0, 0, self.layout)
         self.tile_list.append(tile)  
         
         # Create every player
@@ -309,37 +320,37 @@ class Game(arcade.View):
             
         # Create board elements: Border 
         image_path = r'assets/images/board.border.png'
-        self.board_border = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2
+        self.board_border = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width/2
+        y = self.layout.height/2
         self.board_border.position = x, y
               
         # Create board elements: Scoring area
         image_path = r'assets/images/board.scoring.png'
-        self.board_scoring = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH - MARGIN_INNER - self.board_scoring.width/2
-        y = SCREEN_HEIGHT - MARGIN_INNER - self.board_scoring.height/2
+        self.board_scoring = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width - 60 * self.layout.scale - self.board_scoring.width/2
+        y = self.layout.height - 60 * self.layout.scale - self.board_scoring.height/2
         self.board_scoring.position = x, y
         
         # Create board elements: Contract area
         image_path = r'assets/images/board.contract.png'
-        self.board_contract = BoardElement(image_path, SCALE)
-        x = MARGIN_INNER + self.board_contract.width/2
-        y = SCREEN_HEIGHT - MARGIN_INNER - self.board_contract.height/2
+        self.board_contract = BoardElement(image_path, self.layout.scale)
+        x = 60 * self.layout.scale + self.board_contract.width/2
+        y = self.layout.height - 60 * self.layout.scale - self.board_contract.height/2
         self.board_contract.position = x, y
         
         # Create board elements: Trick area (won)
         image_path = r'assets/images/board.tricks.won.png'
-        self.board_tricks_won = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH - MARGIN_INNER - self.board_tricks_won.width/2
-        y = MARGIN_INNER + self.board_tricks_won.height/2
+        self.board_tricks_won = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width - 60 * self.layout.scale - self.board_tricks_won.width/2
+        y = 60 * self.layout.scale + self.board_tricks_won.height/2
         self.board_tricks_won.position = x, y
 
         # Create board elements: Trick area (lost)
         image_path = r'assets/images/board.tricks.lost.png'
-        self.board_tricks_lost = BoardElement(image_path, SCALE)
-        x = MARGIN_INNER + self.board_tricks_lost.width/2
-        y = MARGIN_INNER + self.board_tricks_lost.height/2
+        self.board_tricks_lost = BoardElement(image_path, self.layout.scale)
+        x = 60 * self.layout.scale + self.board_tricks_lost.width/2
+        y = 60 * self.layout.scale + self.board_tricks_lost.height/2
         self.board_tricks_lost.position = x, y
           
         # Add to board element list
@@ -351,50 +362,50 @@ class Game(arcade.View):
         
         # Create texture element: Texture
         image_path =  r'assets/images/board.texture.png'
-        self.board_texture = BoardElement(image_path, SCALE)
-        self.board_texture.position = SCREEN_WIDTH/2, SCREEN_HEIGHT/2
+        self.board_texture = BoardElement(image_path, self.layout.scale)
+        self.board_texture.position = self.layout.width/2, self.layout.height/2
         self.texture_elements.append(self.board_texture)
         
         # Create bidding elements: Grid
         image_path = r'assets/images/bidding.grid.png'
-        self.bidding_grid = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2 + 40*SCALE
+        self.bidding_grid = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width/2
+        y = self.layout.height/2 + 40*self.layout.scale
         self.bidding_grid.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
-        self.bidding_strip_bottom = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2 - 245*SCALE
+        self.bidding_strip_bottom = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width/2
+        y = self.layout.height/2 - 245*self.layout.scale
         self.bidding_strip_bottom.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
-        self.bidding_strip_top = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2 + 320*SCALE
+        self.bidding_strip_top = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width/2
+        y = self.layout.height/2 + 320*self.layout.scale
         self.bidding_strip_top.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
-        self.bidding_strip_left = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2 - 530*SCALE
-        y = SCREEN_HEIGHT/2
+        self.bidding_strip_left = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width/2 - 530*self.layout.scale
+        y = self.layout.height/2
         self.bidding_strip_left.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
-        self.bidding_strip_right = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2 + 530*SCALE
-        y = SCREEN_HEIGHT/2
+        self.bidding_strip_right = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width/2 + 530*self.layout.scale
+        y = self.layout.height/2
         self.bidding_strip_right.position = x, y
         
         # Create bidding elements: HCP pad
         image_path = r'assets/images/hcp.overlay.png'
-        self.hcp_overlay = BoardElement(image_path, SCALE)
-        x = SCREEN_WIDTH/2
-        y = 30*SCALE
+        self.hcp_overlay = BoardElement(image_path, self.layout.scale)
+        x = self.layout.width/2
+        y = 30*self.layout.scale
         self.hcp_overlay.position = x, y
         
         # Add to bidding element list
@@ -406,8 +417,8 @@ class Game(arcade.View):
         self.bidding_elements.append(self.bidding_strip_right)
 
         # Create main light source
-        self.center_light = Light(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
-                             radius=LIGHT_RADIUS,
+        self.center_light = Light(self.layout.width / 2, self.layout.height / 2,
+                             radius=self.layout.light_radius,
                              color=arcade.color.BEIGE,
                              mode='soft')
         
@@ -428,6 +439,56 @@ class Game(arcade.View):
         # Start thread to receive messages
         self.recv_thread = threading.Thread(target=self.receive_state, daemon=True)
         self.recv_thread.start()
+        
+        
+        
+    def on_resize(self, width, height):
+        """Rescales sprites"""
+
+        # Calculate resize factors
+        resize_x = width / self.layout.width
+        resize_y = height / self.layout.height
+        
+        # Update layout variables
+        self.layout.update(width, height)
+        
+        # All sprite collections that need single scale rescaling
+        sprite_collections = [
+            self.board_elements,
+            self.bidding_elements, 
+            self.texture_elements,
+            self.tile_list,
+            self.card_list
+        ]
+        
+        # Rescale and reposition all sprites
+        for collection in sprite_collections:
+            for sprite in collection:
+                # Rescale position
+                sprite.center_x *= resize_x
+                sprite.center_y *= resize_y
+                # Rescale sprite
+                if sprite == self.board_border:
+                    sprite.scale_x *= resize_x
+                    sprite.scale_y *= resize_y
+                else:
+                    sprite.scale = self.layout.scale
+        
+        # Rescale bidding tiles
+        for tile in self.tile_list:
+            if tile.type == "normal":
+                suit_index = TILE_SUITS.index(tile.suit)
+                level_index = TILE_LEVELS.index(tile.level)
+                tile.set_position_by_index(suit_index, level_index, self.layout)
+            else:
+                tile.set_position_by_index(0, 0, self.layout)
+
+        # Rescale light source
+        self.center_light.radius = self.layout.light_radius
+            
+        # Reposition cards
+        self.adjust_card_position()
+            
 
         
         
@@ -436,15 +497,15 @@ class Game(arcade.View):
         
         # Shrink previous enlarged card
         for card in self.card_list:
-            if card != self.hover_card and card.scale != CARD_SCALE:
-                card.scale = CARD_SCALE
-            elif card.location != "hand" and card.scale != CARD_SCALE:
-                card.scale = CARD_SCALE
+            if card != self.hover_card and card.scale != self.layout.scale:
+                card.scale = self.layout.scale
+            elif card.location != "hand" and card.scale != self.layout.scale:
+                card.scale = self.layout.scale
         
         # Enlarge card we are hovering above
         if (self.hover_card != None):
             if self.hover_card.location == "hand":
-                self.hover_card.scale = CARD_SCALE*CARD_ENLARGE
+                self.hover_card.scale = self.layout.scale*CARD_ENLARGE
                 
         # Adjust card facing
         for card in self.card_list:
@@ -549,8 +610,8 @@ class Game(arcade.View):
                 rel_position = self.get_display_position(self.player_position, card.owner)
                 
                 # Offset
-                offset_x = 50 * SCALE
-                offset_y = 50 * SCALE
+                offset_x = 50 * self.layout.scale
+                offset_y = 50 * self.layout.scale
                 
                 # Set new position for radial spread
                 if rel_position == "bottom":
@@ -996,20 +1057,20 @@ class Game(arcade.View):
     
                 # Find position and angle
                 if rel_position == "bottom":
-                    x = SCREEN_WIDTH / 2 + t * 60 * SCALE
-                    y = CARD_HEIGHT / 2 - abs(t) ** 2 * 2.25 * SCALE
+                    x = self.layout.width / 2 + t * 60 * self.layout.scale
+                    y = self.layout.card_height / 2 - abs(t) ** 2 * 2.25 * self.layout.scale
                     angle = t / max_cards * 60  
                 elif rel_position == "top":
-                    x = SCREEN_WIDTH/2 + t * 40 * SCALE
-                    y = SCREEN_HEIGHT - CARD_HEIGHT/8 + abs(t) ** 2 * 3 * SCALE
+                    x = self.layout.width/2 + t * 40 * self.layout.scale
+                    y = self.layout.height - self.layout.card_height/8 + abs(t) ** 2 * 3 * self.layout.scale
                     angle = -t / max_cards * 80
                 elif rel_position == "left":
-                    x = CARD_HEIGHT/8 - abs(t) ** 2 * 3 * SCALE
-                    y = SCREEN_HEIGHT/2 + t * 40 * SCALE
+                    x = self.layout.card_height/8 - abs(t) ** 2 * 3 * self.layout.scale
+                    y = self.layout.height/2 + t * 40 * self.layout.scale
                     angle = (-t / max_cards * 80) - 90
                 elif rel_position == "right":
-                    x = SCREEN_WIDTH - CARD_HEIGHT/8 + abs(t) ** 2 * 3 * SCALE
-                    y = SCREEN_HEIGHT/2 + t * 40 * SCALE
+                    x = self.layout.width - self.layout.card_height/8 + abs(t) ** 2 * 3 * self.layout.scale
+                    y = self.layout.height/2 + t * 40 * self.layout.scale
                     angle = (t / max_cards * 80) + 90
     
                 # Set position and angle
@@ -1033,23 +1094,23 @@ class Game(arcade.View):
             # Get relative board position of that owner (relative to this player)
             rel_owner = self.get_display_position(self.player_position, card.owner)
             if rel_owner == 'bottom':
-                card.position = TABLE_X, TABLE_Y - CARD_HEIGHT*0.6
+                card.position = self.layout.width/2, self.layout.height/2 - self.layout.card_height*0.6
                 card.angle = 7
             elif rel_owner == 'left':
-                card.position = TABLE_X - CARD_WIDTH*0.6, TABLE_Y
+                card.position = self.layout.width/2 - self.layout.card_width*0.6, self.layout.height/2
                 card.angle = -30
             elif rel_owner == 'top':
-                card.position = TABLE_X, TABLE_Y + CARD_HEIGHT*0.6
+                card.position = self.layout.width/2, self.layout.height/2+ self.layout.card_height*0.6
                 card.angle = -5
             else:
-                card.position = TABLE_X + CARD_WIDTH*0.6, TABLE_Y
+                card.position = self.layout.width/2 + self.layout.card_width*0.6, self.layout.height/2
                 card.angle = 40
             # Calculate dummy offset
             dummy_position = self.get_display_position(self.player_position, self.dummy_position)
             if dummy_position == "bottom":
-                card.center_y += CARD_HEIGHT/4
+                card.center_y += self.layout.card_height/4
             elif dummy_position == "top":
-                card.center_y -= CARD_HEIGHT/4
+                card.center_y -= self.layout.card_height/4
             else:
                 pass
                 
@@ -1087,14 +1148,14 @@ class Game(arcade.View):
                 card.facing = "down"
                 batch = int(np.floor(i/4))
                 if len(stack) <= 20:
-                    x = board.left + CARD_HEIGHT/2 + batch*26*SCALE
+                    x = board.left + self.layout.card_height/2 + batch*26*self.layout.scale
                 else:
                     if i < 24:
-                        x = board.left + CARD_HEIGHT/2
+                        x = board.left + self.layout.card_height/2
                         card.facing = "wrapped"
                     else:
-                        x = board.left + CARD_HEIGHT/2 + batch*26*SCALE
-                y = board.bottom + CARD_WIDTH/2 + 50*SCALE
+                        x = board.left + self.layout.card_height/2 + batch*26*self.layout.scale
+                y = board.bottom + self.layout.card_width/2 + 50*self.layout.scale
                 card.position = x, y
             
     def arrange_dummy_cards(self):
@@ -1127,17 +1188,17 @@ class Game(arcade.View):
                 # Calculate horizontal and vertical position based on suit
                 dummy_position = self.get_display_position(self.player_position, self.dummy_position)
                 if dummy_position == "left":
-                    x = MARGIN_INNER + (2*suit_index+1)/2*CARD_WIDTH + suit_index*10*SCALE
-                    y = SCREEN_HEIGHT/3*2 - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
+                    x = 60*self.layout.scale + (2*suit_index+1)/2*self.layout.card_width + suit_index*10*self.layout.scale
+                    y = self.layout.height/3*2 - self.layout.card_height/2 - card_index*self.layout.card_height/5
                 elif dummy_position == "right":
-                    x = SCREEN_WIDTH - MARGIN_INNER - (2*(3-suit_index)+1)/2*CARD_WIDTH - (3-suit_index)*10*SCALE
-                    y = SCREEN_HEIGHT/3*2 - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
+                    x = self.layout.width - 60*self.layout.scale - (2*(3-suit_index)+1)/2*self.layout.card_width - (3-suit_index)*10*self.layout.scale
+                    y = self.layout.height/3*2 - self.layout.card_height/2 - card_index*self.layout.card_height/5
                 elif dummy_position == "top":
-                    x = SCREEN_WIDTH/2 + ((2*suit_index+1)/2 - 2)*CARD_WIDTH + (suit_index*10 - 15)*SCALE
-                    y = SCREEN_HEIGHT - MARGIN_INNER - CARD_HEIGHT/2 - card_index*CARD_HEIGHT/5
+                    x = self.layout.width/2 + ((2*suit_index+1)/2 - 2)*self.layout.card_width + (suit_index*10 - 15)*self.layout.scale
+                    y = self.layout.height - 60*self.layout.scale - self.layout.card_height/2 - card_index*self.layout.card_height/5
                 else:
-                    x = SCREEN_WIDTH/2 + ((2*suit_index+1)/2 - 2)*CARD_WIDTH + (suit_index*10 - 15)*SCALE
-                    y = MARGIN_INNER + CARD_HEIGHT/2 + card_index*CARD_HEIGHT/5
+                    x = self.layout.width/2 + ((2*suit_index+1)/2 - 2)*self.layout.card_width + (suit_index*10 - 15)*self.layout.scale
+                    y = 60*self.layout.scale + self.layout.card_height/2 + card_index*self.layout.card_height/5
                 card.position = x, y
                 card.angle = 0
                 card.facing = "up"
@@ -1186,23 +1247,23 @@ class Game(arcade.View):
             
             # Define annotation position
             if rel_position == 'bottom':
-                x = SCREEN_WIDTH / 2
-                y = MARGIN_OUTER if is_outside else CARD_HEIGHT / 8 * 9
+                x = self.layout.width / 2
+                y = 30 * self.layout.scale if is_outside else self.layout.card_height / 8 * 9
                 a = 0
                 dodge = [0, 1]
             elif rel_position == 'left':
-                x = MARGIN_OUTER if is_outside else CARD_HEIGHT / 4 * 3
-                y = SCREEN_HEIGHT / 2
+                x = 30 * self.layout.scale if is_outside else self.layout.card_height / 4 * 3
+                y = self.layout.height / 2
                 a = -90
                 dodge = [1, 0]
             elif rel_position == 'top':
-                x = SCREEN_WIDTH / 2
-                y = SCREEN_HEIGHT - MARGIN_OUTER if is_outside else SCREEN_HEIGHT - CARD_HEIGHT / 4 * 3
+                x = self.layout.width / 2
+                y = self.layout.height - 30 * self.layout.scale if is_outside else self.layout.height - self.layout.card_height / 4 * 3
                 a = 0
                 dodge = [0, -1]
             else:  # 'right'
-                x = SCREEN_WIDTH - MARGIN_OUTER if is_outside else SCREEN_WIDTH - CARD_HEIGHT / 4 * 3
-                y = SCREEN_HEIGHT / 2
+                x = self.layout.width - 30 * self.layout.scale if is_outside else self.layout.width - self.layout.card_height / 4 * 3
+                y = self.layout.height / 2
                 a = 90
                 dodge = [-1, 0]
                 
@@ -1217,7 +1278,7 @@ class Game(arcade.View):
                 label,
                 x=x, y=y,
                 color=arcade.color.WHITE,
-                font_size=22.5*SCALE, font_name="Courier New",
+                font_size=22.5*self.layout.scale, font_name="Courier New",
                 anchor_x="center", anchor_y="center",
                 align="center", rotation=a
             )
@@ -1232,54 +1293,54 @@ class Game(arcade.View):
             # Write name annotation
             text = arcade.Text(
                 label,
-                x=x+dodge[0]*30*SCALE,
-                y=y+dodge[1]*30*SCALE,
+                x=x+dodge[0]*30*self.layout.scale,
+                y=y+dodge[1]*30*self.layout.scale,
                 color=[255, 255, 255, 100],
-                font_size=18*SCALE, font_name="Courier New",
+                font_size=18*self.layout.scale, font_name="Courier New",
                 anchor_x="center", anchor_y="center",
                 align="center", rotation=a
             )
             text.draw()
             
         # Contract: Team
-        x = self.board_contract.right - 55*SCALE
-        y = self.board_contract.bottom + 175*SCALE
-        text = self.annotate_state_text(self.contract_team, 17, x, y, 0, 22*SCALE)  # self.contract_team
+        x = self.board_contract.right - 55*self.layout.scale
+        y = self.board_contract.bottom + 175*self.layout.scale
+        text = self.annotate_state_text(self.contract_team, 17, x, y, 0, 22*self.layout.scale)  # self.contract_team
         text.draw()
         
         # Contract: Bid
-        x = self.board_contract.right - 55*SCALE
-        y = self.board_contract.bottom + 120*SCALE
+        x = self.board_contract.right - 55*self.layout.scale
+        y = self.board_contract.bottom + 120*self.layout.scale
         symbol = self.get_suit_symbol(self.contract_suit)
         value = f"{self.contract_level} of [{symbol}]"
-        text = self.annotate_state_text(value, 18, x, y, 0, 22*SCALE) # self.contract_level/bid
+        text = self.annotate_state_text(value, 18, x, y, 0, 22*self.layout.scale) # self.contract_level/bid
         text.draw()
         
         # Contract: Bid
-        x = self.board_contract.right - 55*SCALE
-        y = self.board_contract.bottom + 65*SCALE
-        text = self.annotate_state_text(self.contract_doubled, 15, x, y, 0, 22*SCALE)
+        x = self.board_contract.right - 55*self.layout.scale
+        y = self.board_contract.bottom + 65*self.layout.scale
+        text = self.annotate_state_text(self.contract_doubled, 15, x, y, 0, 22*self.layout.scale)
         text.draw()
         
         # Scoring: Points
-        x = self.board_scoring.right - 55*SCALE
-        y = self.board_scoring.bottom + 175*SCALE
+        x = self.board_scoring.right - 55*self.layout.scale
+        y = self.board_scoring.bottom + 175*self.layout.scale
         value = self.score
-        text = self.annotate_state_text(value, 15, x, y, 0, 22*SCALE)
+        text = self.annotate_state_text(value, 15, x, y, 0, 22*self.layout.scale)
         text.draw()
         
         # Scoring: Games
-        x = self.board_scoring.right - 55*SCALE
-        y = self.board_scoring.bottom + 120*SCALE
+        x = self.board_scoring.right - 55*self.layout.scale
+        y = self.board_scoring.bottom + 120*self.layout.scale
         value = f"{self.current_game}/{self.total_games}"
-        text = self.annotate_state_text(value, 16, x, y, 0, 22*SCALE)
+        text = self.annotate_state_text(value, 16, x, y, 0, 22*self.layout.scale)
         text.draw()
         
         # Scoring: Vulnerability
-        x = self.board_scoring.right - 55*SCALE
-        y = self.board_scoring.bottom + 65*SCALE
+        x = self.board_scoring.right - 55*self.layout.scale
+        y = self.board_scoring.bottom + 65*self.layout.scale
         value = self.vulnerability
-        text = self.annotate_state_text(value, 17, x, y, 0, 22*SCALE)
+        text = self.annotate_state_text(value, 17, x, y, 0, 22*self.layout.scale)
         text.draw()
         
         
@@ -1413,7 +1474,7 @@ class Game(arcade.View):
             label.upper(),
             x=x, y=y,
             color=color,
-            font_size=size*SCALE, font_name="Courier New",
+            font_size=size*self.layout.scale, font_name="Courier New",
             anchor_x="center", anchor_y="center",
             align="center", rotation=angle
         )
@@ -1499,6 +1560,9 @@ class MenuView(arcade.View):
         self.create_ui_elements()
         self.position_ui_elements()
         self.setup_event_handlers()
+        
+        # Set layout
+        self.layout = Layout(1600, 900)
 
     def load_assets(self):
         """Load all required assets."""
@@ -1682,7 +1746,7 @@ class MenuView(arcade.View):
             main_view.setup()
             
             # Open main view
-            self.window.set_size(SCREEN_WIDTH, SCREEN_HEIGHT)
+            self.window.set_size(self.layout.width, self.layout.height)
             self.window.set_caption("Bridge: Client")
             self.window.show_view(main_view)
         
@@ -1755,7 +1819,7 @@ class MenuView(arcade.View):
 
 def main():
     """ Main function """
-    window = arcade.Window(LOBBY_WIDTH, LOBBY_HEIGHT, LOBBY_TITLE, resizable=False)
+    window = arcade.Window(LOBBY_WIDTH, LOBBY_HEIGHT, LOBBY_TITLE, resizable=True)
     menu_view = MenuView()  # Start with menu view
     window.show_view(menu_view)
     arcade.run()

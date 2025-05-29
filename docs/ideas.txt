@@ -2,18 +2,12 @@
 - replace "_elements" with "_list"
 - remove unused functions and variables
 - use PEP8 format style
-- replace northsouth/eastwest with we/they
-
-# drawing:
-- fix light texture effect on beige color
 
 # connection
 - fix data transfer when rejoining
-- remove silently disconnected clients
 
 # lobby
-- screen resolution widget
-- "save as default" button
+- no resizable window
 - do not trigger "ESC" with active modifier "CTRL"
 
 # scoring:

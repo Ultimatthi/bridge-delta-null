@@ -7,6 +7,7 @@ from arcade.future.light import Light, LightLayer
 import socket
 import threading
 import pickle
+import json
 import time
 import numpy as np
 import random
@@ -1614,9 +1615,12 @@ class MenuView(arcade.View):
         """Create all UI elements."""
         self.manager = arcade.gui.UIManager()
         
+        # Load player data
+        username, server, default_position = self.load_player_data()
+        
         # Create text input fields: 1
         self.username_widget = arcade.gui.UIInputText(
-            text="Icarus",
+            text=username,
             height=35 * LOBBY_SCALE, 
             width=(370 - 2 * 12) * LOBBY_SCALE,
             font_name="Courier New",
@@ -1628,7 +1632,7 @@ class MenuView(arcade.View):
         
         # Create text input fields: 2
         self.server_widget = arcade.gui.UIInputText(
-            text="localhost:55556",
+            text=server,
             height=35 * LOBBY_SCALE, 
             width=(370 - 2 * 12) * LOBBY_SCALE,
             font_name="Courier New",
@@ -1647,9 +1651,9 @@ class MenuView(arcade.View):
         )
         
         # Create position toggle buttons
-        self.create_position_toggles()
+        self.create_position_toggles(default_position)
 
-    def create_position_toggles(self):
+    def create_position_toggles(self, default_position):
         """Create the position toggle buttons."""
         # Position name mapping for each toggle
         position_names = ["north", "east", "south", "west", "random"]
@@ -1670,8 +1674,12 @@ class MenuView(arcade.View):
             # Store references to specific toggles for positioning later
             setattr(self, f"{position}_widget", toggle)
             
-        # Set "random" toggle to default
-        self.toggle_list[4].value = True
+        # Set default toggle
+        if default_position in PLAYER_POSITIONS:
+            index = PLAYER_POSITIONS.index(default_position)
+            self.toggle_list[index].value = True
+        else:
+            self.toggle_list[4].value = True
 
     def position_ui_elements(self):
         """Position all UI elements on the screen."""
@@ -1732,6 +1740,13 @@ class MenuView(arcade.View):
                 if toggle.value:
                     selected_position = position
                     break
+                
+            # Save player data
+            self.save_player_data(
+                self.username_widget.text, 
+                self.server_widget.text, 
+                selected_position
+            )
                 
             # Randomly pick a position if toggle says so
             if selected_position == "random":
@@ -1812,7 +1827,26 @@ class MenuView(arcade.View):
                 if widget.active:
                     widget.caret.mark = 0
                     widget.caret.position = len(widget.text)
-                     
+                    
+    def save_player_data(self, name, server, position, filename="playerdata.json"):
+        data = {
+            "name": name,
+            "server": server,
+            "position": position  # Could be a string or a list/tuple
+        }
+        with open(filename, "w") as f:
+            json.dump(data, f)
+            
+            
+    def load_player_data(self, filename="playerdata.json"):
+        try:
+            with open(filename, "r") as f:
+                data = json.load(f)
+                return data["name"], data["server"], data["position"]
+        except (FileNotFoundError, KeyError, json.JSONDecodeError):
+            # Return defaults if file not found or corrupted
+            return "", "", (0, 0)
+                         
             
 
 # ──[ Main ]───────────────────────────────────────────────────────────────────

@@ -782,11 +782,10 @@ class Game(arcade.View):
             # Disconnect
             try:
                 self.socket.sendall(pickle.dumps(action))
-                self.socket.shutdown(socket.SHUT_RDWR)
             except Exception:
                 pass
             finally:
-                pass #self.socket.close()
+                self.socket.shutdown(socket.SHUT_RDWR)
                 
             # Switch to Lobby
             menu_view = MenuView()
@@ -848,8 +847,8 @@ class Game(arcade.View):
             try:
                 data = self.socket.recv(4096)
                 self.update_state(data)
-            except socket.error as e:
-                print(f"Network error: {e}")
+            except:
+                print("Connection lost")
                 time.sleep(0.1)
                 continue
                 
@@ -863,6 +862,7 @@ class Game(arcade.View):
         # Update game state variables
         self.game_phase = game_state.get("game_phase")
         self.current_turn = game_state.get("current_turn")
+        self.original_turn = game_state.get("original_turn")
         self.contract_suit = game_state.get("contract_suit")
         self.contract_level = game_state.get("contract_level")
         self.contract_doubled = game_state.get("contract_doubled")
@@ -1027,11 +1027,6 @@ class Game(arcade.View):
         
         # Get cards on table
         table = [card for card in self.card_list if card.location == "table"]
-        
-        # Save opener of turn
-        if len(table) == 0:
-            self.original_turn = self.current_turn
-            return
         
         # Order cards on table [horizontally]
         for card in table:

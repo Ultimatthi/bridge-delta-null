@@ -30,7 +30,7 @@ SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 # Logic parameters
 IDLE_TIME_PLAY = 0.5
 IDLE_TIME_TRICK = 1.0
-IDLE_TIME_PHASE = 1.0
+IDLE_TIME_PHASE = 0.5
 FPS = 20
 
 
@@ -116,6 +116,7 @@ class GameServer:
         self.client_list = []
         self.bot_list = []
         self.current_turn = "north"
+        self.original_turn = "north"
         self.current_sound = None
         self.contract_suit = None
         self.contract_level = None
@@ -331,6 +332,10 @@ class GameServer:
         
         # Count cards on table
         table = [card for card in self.card_list if card.location == "table"]
+        
+        # Save opener of turn
+        if len(table) == 0:
+            self.original_turn = self.current_turn
         
         if len(table) < 4:
                     
@@ -875,6 +880,7 @@ class GameServer:
                 "bidding_history": [],
                 "game_phase": self.game_phase,
                 "current_turn": self.current_turn,
+                "original_turn": self.original_turn,
                 "sound": self.current_sound,
                 "contract_suit": self.contract_suit,
                 "contract_level": self.contract_level,

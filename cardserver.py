@@ -113,6 +113,7 @@ class GameServer:
     
     def __init__(self):
         self.game_phase = "dealing"
+        self.broadcast_timer = 0.0
         self.client_list = []
         self.bot_list = []
         self.current_turn = "north"
@@ -253,6 +254,21 @@ class GameServer:
             
             
     def on_update(self, delta_time):
+        
+        # Update time since last broadcast
+        self.broadcast_timer += delta_time
+        
+        # Send heartbeat to all clients
+        if self.broadcast_timer > 5.0:
+            # Reset timer
+            self.broadcast_timer = 0.0
+            # Set sound to silent
+            original_sound = self.current_sound
+            self.current_sound = None
+            # Send hearbeat
+            self.broadcast()
+            # Reset sound
+            self.current_sound = original_sound
         
         # Check if required number of players are on server
         if len(self.client_list) < FULL_TABLE:
@@ -934,8 +950,9 @@ class GameServer:
                 size = pickle.dumps(game_state)
                 print(f"Sending game state ({len(size)} bytes)")
                 client.socket.sendall(pickle.dumps(game_state))
-            except Exception as e:
-                print(f"Error sending to {client.position}: {e}")
+            except Exception:
+                print(f"Error sending to {client.position}")
+                self.remove_player(client.position)
 
 
 

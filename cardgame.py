@@ -41,6 +41,8 @@ LOBBY_HEIGHT = 720
 LOBBY_TITLE = "Bridge: Lobby"
 LOBBY_SCALE = min(LOBBY_HEIGHT/1080, LOBBY_WIDTH/1920)
 
+
+
 # ──[ Classes ]────────────────────────────────────────────────────────────────
 
 class Layout:
@@ -1562,8 +1564,19 @@ class MenuView(arcade.View):
         self.position_ui_elements()
         self.setup_event_handlers()
         
-        # Set layout
-        self.layout = Layout(1600, 900)
+        # Fix size
+        self.window.set_minimum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+        self.window.set_maximum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+        
+    def on_resize(self, width, height):
+        
+        # Center window
+        x, y = self.window.center
+        self.window.set_location(
+            int(x - self.window.width/4), 
+            int(y - self.window.height/4)
+        )
+ 
 
     def load_assets(self):
         """Load all required assets."""
@@ -1761,7 +1774,7 @@ class MenuView(arcade.View):
             main_view.setup()
             
             # Open main view
-            self.window.set_size(self.layout.width, self.layout.height)
+            self.window.set_size(1600, 900)
             self.window.set_caption("Bridge: Client")
             self.window.show_view(main_view)
         

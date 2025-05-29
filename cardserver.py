@@ -156,7 +156,7 @@ class GameServer:
                 
         # Create every player
         for position in PLAYER_POSITIONS:
-            name = str(position) + "(Bot)"
+            name = "Bot"
             bot = Client(None, name, position)
             self.bot_list.append(bot)
         

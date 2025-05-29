@@ -303,7 +303,7 @@ class Game(arcade.View):
         
         # Create every player
         for position in PLAYER_POSITIONS:
-            name = str(position) + "(Bot)"
+            name = str(position)
             player = Player(name, position)
             self.player_list.append(player)
             
@@ -366,14 +366,14 @@ class Game(arcade.View):
         image_path = r'assets/images/bidding.strip.png'
         self.bidding_strip_bottom = BoardElement(image_path, SCALE)
         x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2 - 260*SCALE
+        y = SCREEN_HEIGHT/2 - 245*SCALE
         self.bidding_strip_bottom.position = x, y
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.png'
         self.bidding_strip_top = BoardElement(image_path, SCALE)
         x = SCREEN_WIDTH/2
-        y = SCREEN_HEIGHT/2 + 330*SCALE
+        y = SCREEN_HEIGHT/2 + 320*SCALE
         self.bidding_strip_top.position = x, y
         
         # Create bidding elements: Strips
@@ -1175,28 +1175,38 @@ class Game(arcade.View):
             # Check if this is the dummy player
             is_dummy = player.position == self.dummy_position and hand_cards < 52
             
+            # Check if game did not start yet
+            is_dealing = self.game_phase == "dealing"
+            
+            # Set name drawing to the outside
+            is_outside = is_dummy or is_dealing
+            
             # Get relative board position
             rel_position = self.get_display_position(self.player_position, player.position)
             
             # Define annotation position
             if rel_position == 'bottom':
                 x = SCREEN_WIDTH / 2
-                y = MARGIN_OUTER if is_dummy else CARD_HEIGHT / 8 * 9
+                y = MARGIN_OUTER if is_outside else CARD_HEIGHT / 8 * 9
                 a = 0
+                dodge = [0, 1]
             elif rel_position == 'left':
-                x = MARGIN_OUTER if is_dummy else CARD_HEIGHT / 4 * 3
+                x = MARGIN_OUTER if is_outside else CARD_HEIGHT / 4 * 3
                 y = SCREEN_HEIGHT / 2
                 a = -90
+                dodge = [1, 0]
             elif rel_position == 'top':
                 x = SCREEN_WIDTH / 2
-                y = SCREEN_HEIGHT - MARGIN_OUTER if is_dummy else SCREEN_HEIGHT - CARD_HEIGHT / 4 * 3
+                y = SCREEN_HEIGHT - MARGIN_OUTER if is_outside else SCREEN_HEIGHT - CARD_HEIGHT / 4 * 3
                 a = 0
+                dodge = [0, -1]
             else:  # 'right'
-                x = SCREEN_WIDTH - MARGIN_OUTER if is_dummy else SCREEN_WIDTH - CARD_HEIGHT / 4 * 3
+                x = SCREEN_WIDTH - MARGIN_OUTER if is_outside else SCREEN_WIDTH - CARD_HEIGHT / 4 * 3
                 y = SCREEN_HEIGHT / 2
                 a = 90
+                dodge = [-1, 0]
                 
-            # Define label
+            # Add turn indication marks
             if player.position == self.current_turn:
                 label = "▸"  + player.name.upper() + "◂"
             else:
@@ -1208,6 +1218,24 @@ class Game(arcade.View):
                 x=x, y=y,
                 color=arcade.color.WHITE,
                 font_size=22.5*SCALE, font_name="Courier New",
+                anchor_x="center", anchor_y="center",
+                align="center", rotation=a
+            )
+            text.draw()
+            
+            # Set name annotation label
+            if is_dummy:
+                label = ""
+            else:
+                label = player.position.upper()
+            
+            # Write name annotation
+            text = arcade.Text(
+                label,
+                x=x+dodge[0]*30*SCALE,
+                y=y+dodge[1]*30*SCALE,
+                color=[255, 255, 255, 100],
+                font_size=18*SCALE, font_name="Courier New",
                 anchor_x="center", anchor_y="center",
                 align="center", rotation=a
             )

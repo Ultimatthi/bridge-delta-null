@@ -13,6 +13,7 @@ import numpy as np
 import random
 import arcade.gui
 import pyperclip
+import ctypes
 
 # ──[ Parameters ]─────────────────────────────────────────────────────────────
 
@@ -213,7 +214,7 @@ class Game(arcade.View):
         arcade.load_font("assets/fonts/CourierNewBold.ttf")
         
         # Layout
-        self.layout = Layout(1600, 900)
+        self.layout = Layout(self.window.width, self.window.height)
         
     def setup(self):
         """ Set up the game here. Call this function to restart the game. """
@@ -488,11 +489,12 @@ class Game(arcade.View):
 
         # Rescale light source
         self.center_light.radius = self.layout.light_radius
+        self.center_light.center_x = width/2
+        self.center_light.center_y = height/2
             
         # Reposition cards
         self.adjust_card_position()
-            
-
+        
         
         
     def on_update(self, delta_time):
@@ -835,7 +837,7 @@ class Game(arcade.View):
             self.ctrl_held = True
             
         # Leave game
-        if key == arcade.key.ESCAPE:
+        if key == arcade.key.ESCAPE and self.ctrl_held == False:
             
             # Set running to False to stop thread
             self.running = False
@@ -851,6 +853,11 @@ class Game(arcade.View):
             finally:
                 self.socket.shutdown(socket.SHUT_RDWR)
                 
+            # De-maximize window
+            hwnd = self.window._hwnd
+            if ctypes.windll.user32.IsZoomed(hwnd):
+                ctypes.windll.user32.ShowWindow(hwnd, 9)
+
             # Switch to Lobby
             menu_view = MenuView()
             self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
@@ -1563,20 +1570,14 @@ class MenuView(arcade.View):
         self.create_ui_elements()
         self.position_ui_elements()
         self.setup_event_handlers()
-        
-        # Fix size
-        self.window.set_minimum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
-        self.window.set_maximum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
-        
+    
     def on_resize(self, width, height):
         
-        # Center window
-        x, y = self.window.center
-        self.window.set_location(
-            int(x - self.window.width/4), 
-            int(y - self.window.height/4)
-        )
- 
+        # De-maximize window
+        hwnd = self.window._hwnd
+        if ctypes.windll.user32.IsZoomed(hwnd):
+            ctypes.windll.user32.ShowWindow(hwnd, 9)
+
 
     def load_assets(self):
         """Load all required assets."""
@@ -1764,8 +1765,9 @@ class MenuView(arcade.View):
             # Randomly pick a position if toggle says so
             if selected_position == "random":
                 selected_position = random.choice(PLAYER_POSITIONS)
-            
+                
             # Create main view with the user inputs
+            self.window.set_size(1600, 900)
             main_view = Game(
                 username=self.username_widget.text,
                 server=self.server_widget.text,
@@ -1773,8 +1775,7 @@ class MenuView(arcade.View):
             )
             main_view.setup()
             
-            # Open main view
-            self.window.set_size(1600, 900)
+            # Enter main view
             self.window.set_caption("Bridge: Client")
             self.window.show_view(main_view)
         
@@ -1799,6 +1800,9 @@ class MenuView(arcade.View):
     def on_show_view(self):
         """Called when this view becomes active."""
         self.manager.enable()
+        
+        self.window.set_minimum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+        self.window.set_maximum_size(3840, 2160)
 
     def on_hide_view(self):
         """Called when this view is deactivated."""

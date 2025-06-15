@@ -249,6 +249,9 @@ class Game(arcade.View):
         # Sprite list with all the cards, no matter what pile they are in
         self.card_list = arcade.SpriteList()
         
+        # Sprite list with the top cards
+        self.top_card_list = arcade.SpriteList()
+        
         # Sprite list with all the tile elements
         self.tile_list = arcade.SpriteList()
         
@@ -261,11 +264,11 @@ class Game(arcade.View):
         # Board element list with all the texture elements
         self.texture_elements = arcade.SpriteList()
         
-        # Layer to handle light sources
-        self.light_layer = LightLayer(self.layout.width, self.layout.height)
+        # Board element list with all the overlay elements
+        self.cardoverlay_elements = arcade.SpriteList()
         
-        # Set background of light layer
-        self.light_layer.set_background_color(self.background_color)
+        # Create light
+        self.create_light()
         
         # Init game state
         self.current_turn = None
@@ -419,19 +422,27 @@ class Game(arcade.View):
         self.bidding_elements.append(self.bidding_strip_top)
         self.bidding_elements.append(self.bidding_strip_left)
         self.bidding_elements.append(self.bidding_strip_right)
-
-        # Create main light source
-        self.center_light = Light(self.layout.width / 2, self.layout.height / 2,
-                             radius=self.layout.light_radius,
-                             color=arcade.color.BEIGE,
-                             mode='soft')
         
-        # Add light sources to light layer
-        self.light_layer.add(self.center_light)
+        # Create overlay elements: Card halo
+        image_path = r'assets/images/card.halo.png'
+        self.card_halo = BoardElement(image_path, self.layout.scale)
+        self.card_halo.position = -999, -999
+        
+        # Add to overlay element list
+        self.cardoverlay_elements.append(self.card_halo)
         
         # Connect to socket
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((self.host, self.port))
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.host, self.port))
+        except:
+            print('No connection possible')
+            menu_view = MenuView()
+            self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+            self.window.set_caption(LOBBY_TITLE)
+            self.window.show_view(menu_view)
+            time.sleep(0.5)
+            return
         
         # Send player data to server
         data = {
@@ -443,6 +454,24 @@ class Game(arcade.View):
         # Start thread to receive messages
         self.recv_thread = threading.Thread(target=self.receive_state, daemon=True)
         self.recv_thread.start()
+        
+        
+    def create_light(self):
+        
+        # Layer to handle light sources
+        self.light_layer = LightLayer(self.layout.width, self.layout.height)
+        
+        # Set background of light layer
+        self.light_layer.set_background_color(self.background_color)
+        
+        # Create main light source
+        self.center_light = Light(self.layout.width / 2, self.layout.height / 2,
+                             radius=self.layout.light_radius,
+                             color=[200, 200, 200, 255],
+                             mode='soft')
+        
+        # Add light sources to light layer
+        self.light_layer.add(self.center_light)
         
         
         
@@ -461,6 +490,7 @@ class Game(arcade.View):
             self.board_elements,
             self.bidding_elements, 
             self.texture_elements,
+            self.cardoverlay_elements,
             self.tile_list,
             self.card_list
         ]
@@ -488,9 +518,7 @@ class Game(arcade.View):
                 tile.set_position_by_index(0, 0, self.layout)
 
         # Rescale light source
-        self.center_light.radius = self.layout.light_radius
-        self.center_light.center_x = width/2
-        self.center_light.center_y = height/2
+        self.create_light()
             
         # Reposition cards
         self.adjust_card_position()
@@ -552,12 +580,6 @@ class Game(arcade.View):
             # Draw board elements
             self.board_elements.draw()
             
-            # Color cards
-            self.color_cards()
-            
-            # Draw the cards
-            self.card_list.draw()
-            
             # Draw bidding elements
             if self.game_phase == "bidding":
                 
@@ -576,8 +598,19 @@ class Game(arcade.View):
             # Texture overlay
             self.texture_elements.draw()
             
+            # Color cards
+            self.color_cards()
+            
+            # Draw the cards
+            self.card_list.draw()
+            
+            # Draw card overlay
+            self.draw_card_overlay()
+            
         self.light_layer.draw()
         
+
+    
 
 
     def review_trick(self, held_card):
@@ -1137,6 +1170,8 @@ class Game(arcade.View):
             self.card_list.remove(card)
             self.card_list.append(card)
             
+
+            
     def arrange_stack_cards(self):
         """Order cards in trick stacks"""
         
@@ -1216,15 +1251,48 @@ class Game(arcade.View):
                 
                 
     def color_cards(self):
-        """Color all cards that are trump"""
+        """Color cards"""
         
+        # Highlight trump cards
         for card in self.card_list:
             if card.suit == self.contract_suit and card.facing == "up":
                 card.color = arcade.color.ANTIQUE_WHITE
             else:
                 card.color = arcade.color.WHITE
                 
-                
+    def draw_card_overlay(self):
+        
+        # Get cards on table
+        table = [card for card in self.card_list if card.location == "table"]
+        
+        # Check if trick is complete
+        if len(table) != 4:
+            self.card_halo.position = -999, -999
+            return
+        
+        # Empy top card list
+        self.top_card_list.clear()
+        
+        # Find trick taking card
+        add = False
+        for card in table:
+            if card.owner == self.current_turn:
+                winning_card = card
+                add = True
+            elif add == True:
+                self.top_card_list.append(card)
+            
+        # Position halo
+        self.card_halo.position = winning_card.position
+        self.card_halo.angle = winning_card.angle
+
+        # Draw halo
+        self.cardoverlay_elements.draw()
+        
+        # Draw top cards above halo
+        self.top_card_list.draw()
+     
+            
             
     def annotate(self):
         
@@ -1766,6 +1834,10 @@ class MenuView(arcade.View):
             if selected_position == "random":
                 selected_position = random.choice(PLAYER_POSITIONS)
                 
+            # Reset window boundaries
+            self.window.set_minimum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+            self.window.set_maximum_size(3840, 2160)
+                
             # Create main view with the user inputs
             self.window.set_size(1600, 900)
             main_view = Game(
@@ -1778,7 +1850,7 @@ class MenuView(arcade.View):
             # Enter main view
             self.window.set_caption("Bridge: Client")
             self.window.show_view(main_view)
-        
+    
         # Toggle button events - only one can be selected at a time
         for toggle in self.toggle_list:
             @toggle.event("on_click")
@@ -1802,7 +1874,7 @@ class MenuView(arcade.View):
         self.manager.enable()
         
         self.window.set_minimum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
-        self.window.set_maximum_size(3840, 2160)
+        self.window.set_maximum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
 
     def on_hide_view(self):
         """Called when this view is deactivated."""

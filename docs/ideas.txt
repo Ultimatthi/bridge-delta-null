@@ -6,10 +6,6 @@
 # connection
 - fix data transfer when rejoining
 
-# lobby
-- no resizable window
-- do not trigger "ESC" with active modifier "CTRL"
-
 # scoring:
 - show scoring report
 
@@ -18,3 +14,18 @@
 
 # GitHub
 - add visual previews
+
+# unsolved errors:
+- switching back to menu view after wrong IP address:
+        # Connect to socket
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.host, self.port))
+        except:
+            print('No connection possible')
+            menu_view = MenuView()
+            self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+            self.window.set_caption(LOBBY_TITLE)
+            self.window.show_view(menu_view)
+            time.sleep(0.5)
+            return

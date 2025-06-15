@@ -225,6 +225,9 @@ class Game(arcade.View):
         # Visibility of last trick
         self.last_trick_visible = False
         
+        # Stack state when last trick was reviewed
+        self.last_trick_state = None
+        
         # Set bidding history
         self.bidding_history = []
         
@@ -610,9 +613,6 @@ class Game(arcade.View):
         self.light_layer.draw()
         
 
-    
-
-
     def review_trick(self, held_card):
         
         # Get cards on trick pile
@@ -626,61 +626,19 @@ class Game(arcade.View):
         if held_card != tricks[-1]:
             return
         
-        # Get last trick
-        last_trick = tricks[-4:]
-        
-        # Sort display order
-        position_priority = {"left": 0, "top": 1, "right": 2, "bottom": 3}
-        sorted_last_trick = sorted(
-            last_trick,
-            key=lambda c: position_priority[self.get_display_position(self.player_position, c.owner)]
-        )
-        
         # Play sound
         self.play_sound("review_trick")
+        
+        # Review or hide last trick
+        self.last_trick_visible = not self.last_trick_visible
+        
+        # Remeber stack state
+        self.last_trick_state = len(tricks)
+        
+        # Adjust card positioning
+        self.adjust_card_position()
 
-        if self.last_trick_visible == False:
-            
-            # Turn cards face up and move them radially
-            for card in sorted_last_trick:
-                
-                # Get relative position of card owner
-                rel_position = self.get_display_position(self.player_position, card.owner)
-                
-                # Offset
-                offset_x = 50 * self.layout.scale
-                offset_y = 50 * self.layout.scale
-                
-                # Set new position for radial spread
-                if rel_position == "bottom":
-                    card.center_y -= offset_y
-                    card.angle = 5
-                elif rel_position == "left":
-                    card.center_x -= offset_x
-                    card.angle = -10
-                elif rel_position == "top":
-                    card.center_y += offset_y
-                    card.angle = -5
-                elif rel_position == "right":
-                    card.center_x += offset_x
-                    card.angle = 10
-                            
-                # Pull to top
-                self.pull_to_top(card)
-    
-                # Turn card face up
-                card.facing = "up"
-                
-            self.last_trick_visible = True
-                
-        else:
-            
-            # Turn cards face down and return to original positions
-            self.adjust_card_position()
-                
-            self.last_trick_visible = False
-            
-            
+
         
     def pull_to_top(self, card: arcade.Sprite):
         """ Pull card to top of rendering order (last to render, looks on-top) """
@@ -982,7 +940,7 @@ class Game(arcade.View):
         sound = game_state.get("sound")
         self.play_sound(sound)
         
-        # Get player/bot  info
+        # Get player/bot info
         player_list = game_state.get("players")
         
         # Setup map for fast access
@@ -1068,6 +1026,7 @@ class Game(arcade.View):
         self.arrange_player_cards()
         self.arrange_table_cards()
         self.arrange_stack_cards()
+        self.arrange_reviewed_trick()
         self.arrange_dummy_cards()
         
     def arrange_player_cards(self):
@@ -1202,6 +1161,67 @@ class Game(arcade.View):
                         x = board.left + self.layout.card_height/2 + batch*26*self.layout.scale
                 y = board.bottom + self.layout.card_width/2 + 50*self.layout.scale
                 card.position = x, y
+            
+            
+    
+    def arrange_reviewed_trick(self):
+    
+        if self.last_trick_visible == False:
+            return
+        
+        # Get cards on trick pile
+        tricks = [card for card in self.card_list if card.location == "tricks"]
+        
+        # Check if any tricks
+        if len(tricks) == 0:
+            return
+        
+        # Check if new trick already arrived
+        if self.last_trick_state != len(tricks):
+            self.last_trick_visible = False
+            return
+        
+        # Get last trick
+        last_trick = tricks[-4:]
+        
+        # Sort display order
+        position_priority = {"left": 0, "top": 1, "right": 2, "bottom": 3}
+        sorted_last_trick = sorted(
+            last_trick,
+            key=lambda c: position_priority[self.get_display_position(self.player_position, c.owner)]
+        )
+        
+        # Turn cards face up and move them radially
+        for card in sorted_last_trick:
+            
+            # Get relative position of card owner
+            rel_position = self.get_display_position(self.player_position, card.owner)
+            
+            # Offset
+            offset_x = 50 * self.layout.scale
+            offset_y = 50 * self.layout.scale
+            
+            # Set new position for radial spread
+            if rel_position == "bottom":
+                card.center_y -= offset_y
+                card.angle = 5
+            elif rel_position == "left":
+                card.center_x -= offset_x
+                card.angle = -10
+            elif rel_position == "top":
+                card.center_y += offset_y
+                card.angle = -5
+            elif rel_position == "right":
+                card.center_x += offset_x
+                card.angle = 10
+                            
+            # Pull to top
+            self.pull_to_top(card)
+
+            # Turn card face up
+            card.facing = "up"
+            
+            
             
     def arrange_dummy_cards(self):
         """Order cards in dummy"""

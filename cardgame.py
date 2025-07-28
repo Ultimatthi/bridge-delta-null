@@ -27,7 +27,7 @@ SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 HCP = {'A': 4, 'K': 3, 'Q': 2, 'J': 1}
 
 # Card constants
-CARD_VALUES = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"]
+CARD_VALUES = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 CARD_ENLARGE = 1.1
 
@@ -81,14 +81,14 @@ class Card(arcade.Sprite):
         self.hcp = HCP.get(value, 0)
 
         # Image to use for the sprite when face up
-        self.image = f":resources:images/cards/card{self.suit}{self.value}.png"
+        self.image = f'assets/images/cards/card{self.suit}{self.value}.png'
         
         # Call the parent
         super().__init__(self.image, scale, hit_box_algorithm="None")
         
     def face_down(self):
         """ Turn card face-down """
-        self.texture = arcade.load_texture(":resources:images/cards/cardBack_red2.png")
+        self.texture = arcade.load_texture(r'assets/images/cards/cardBack_red2.png')
         
     def face_down_wrapped(self):
         """ Wraps card in band """
@@ -1024,9 +1024,9 @@ class Game(arcade.View):
             
         # Order cards in different locations
         self.arrange_player_cards()
-        self.arrange_table_cards()
         self.arrange_stack_cards()
         self.arrange_reviewed_trick()
+        self.arrange_table_cards()
         self.arrange_dummy_cards()
         
     def arrange_player_cards(self):

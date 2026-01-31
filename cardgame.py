@@ -1746,8 +1746,8 @@ class MenuView(arcade.View):
         
         # Create launch button
         self.launch_widget = arcade.gui.UITextureButton(
-            height=102 * LOBBY_SCALE,
-            width=412 * LOBBY_SCALE,
+            height=62 * LOBBY_SCALE,
+            width=372 * LOBBY_SCALE,
             texture=self.textures["join_off"],
             texture_hovered=self.textures["join_on"]
         )
@@ -1781,7 +1781,7 @@ class MenuView(arcade.View):
             index = PLAYER_POSITIONS.index(default_position)
             self.toggle_list[index].value = True
         else:
-            self.toggle_list[4].value = True
+            pass #self.toggle_list[4].value = True
 
     def position_ui_elements(self):
         """Position all UI elements on the screen."""
@@ -1805,8 +1805,8 @@ class MenuView(arcade.View):
         # Position launch button
         self.anchor.add(
             child=self.launch_widget,
-            anchor_x="left", align_x=258 * LOBBY_SCALE,
-            anchor_y="bottom", align_y=177 * LOBBY_SCALE
+            anchor_x="left", align_x=279 * LOBBY_SCALE,
+            anchor_y="bottom", align_y=198 * LOBBY_SCALE
         )
         
         # Position toggle buttons

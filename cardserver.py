@@ -125,7 +125,6 @@ class GameServer:
         self.contract_team = None
         self.score = 0 # Positive: Northsouth, negative: Eastwest
         self.current_game = 0
-        self.total_games = 16
         self.vulnerability = "none" # none, both, northsouth, eastwest
         self.dummy_position = None
         self.declarer_position = None
@@ -140,8 +139,18 @@ class GameServer:
 
     def start_server(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # Set ip adress
         host = "0.0.0.0"
-        port = 55556
+        
+        # Set port (user input)
+        port_input = input("Enter port (press Enter for default 55556): ").strip()
+        port = 55556 if not port_input else int(port_input)
+        
+        # Set total number of games (user input)
+        total_games_input = input("Enter total number of games for this session (press Enter for default 16): ").strip()
+        self.total_games = 16 if not total_games_input else int(total_games_input)
+    
         s.bind((host, port))
         s.listen(5)
         s.settimeout(5.0)

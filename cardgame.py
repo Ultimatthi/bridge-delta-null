@@ -202,7 +202,7 @@ class Game(arcade.View):
         self.player_position = position if position is not None else "north"
 
         # Play mat colour
-        self.background_color = arcade.color.ARSENIC
+        self.background_color = self.background_color = (17, 53, 65) # arcade.color.ARSENIC
         
         # Sound effects
         self.sound_slide = arcade.load_sound(r'assets/effects/slide.mp3')

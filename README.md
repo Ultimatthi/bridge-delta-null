@@ -82,6 +82,9 @@ Open terminal (Linux/macOS) or command prompt (Windows) in the directory where y
 ```bash
    python cardgame.py
 ```
+3. Join the game session by connecting to the server at `<host-ip>:<port>`
+   - For local network: Use the host's local IP address (e.g., "192.168.1.50:55556")
+   - For online play: Use the host's public IP address (e.g., "88.214.164.224:55556")
 
 ## License
 This project is licensed under the MIT License — see the LICENSE file for details.

@@ -1,6 +1,9 @@
 # Delta Null
 
-**Delta Null** is a multiplayer bridge card game project developed with Python and the Python Arcade Library. It features turn-based client synchronization over sockets, threaded communication, and custom-designed assets. The key feature of the program is the generation of balanced deals through constrained sampling of hands, ensuring that the net score, as estimated by Double Dummy analysis, is biased toward averaging to zero across a session.
+**Delta Null** is a multiplayer bridge card game developed in Python using the Python Arcade Library.
+The game is designed as a peer-to-peer experience without a central online lobby or matchmaking system. Instead, one player hosts a session locally, while the remaining players connect directly as clients, enabling private games among friends.
+
+The key feature of the program is the generation of balanced deals through constrained sampling of hands, ensuring that the net score, as estimated by Double Dummy analysis, is biased toward averaging to zero across a session.
 
 Although the game can be played with bots (which are very rudimentary), it is intended primarily as a PvP experience. The game follows standard bridge rules with four players using Chicago scoring system.
 
@@ -11,6 +14,16 @@ Launcher:
 Gameplay:
 
 ![gameplay view](docs/images/gameplay.png)
+
+Dealer and vulnerability follow a standard rotation. Any number of deals can be played, but sessions of 16 deals are recommended so that all dealer-vulnerability combinations are represented evenly.
+16-deal session example:
+
+| Block   | Dealer: North | Dealer: East | Dealer: South | Dealer: West |
+|---------|---------------|--------------|---------------|--------------|
+| 01–04   | None          | North-South  | East-West     | Both         |
+| 05–08   | North-South   | East-West    | Both          | None         |
+| 09–12   | East-West     | Both         | None          | North-South  |
+| 13–16   | Both          | None         | North-South   | East-West    |
 
 ## Motivation
 

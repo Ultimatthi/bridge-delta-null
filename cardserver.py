@@ -7,8 +7,9 @@ import threading
 import pickle
 import time
 import random
-import logic.scoring as sc
-import logic.rotation as rot
+import logic.scoring
+import logic.rotating
+import logic.dealing
 
 
 
@@ -148,9 +149,9 @@ class GameServer:
         port = 55556 if not port_input else int(port_input)
         
         # Set total number of games (user input)
-        total_games_input = input("Enter total number of games for this session (press Enter for default 16): ").strip()
+        total_games_input = input("Enter total number of deals for this session (press Enter for default 16): ").strip()
         self.total_games = 16 if not total_games_input else int(total_games_input)
-    
+        
         s.bind((host, port))
         s.listen(5)
         s.settimeout(5.0)
@@ -411,7 +412,7 @@ class GameServer:
             doubled = ""
         
         # Calculate score
-        score = sc.chicago_score(
+        score = logic.scoring.chicago_score(
                     contract_level = self.contract_level,
                     contract_suit = self.contract_suit,
                     doubled = doubled,
@@ -455,7 +456,7 @@ class GameServer:
         self.game_phase = "dealing"
         
         # Rotate dealer and vulnerability
-        self.current_turn, self.vulnerability = rot.chicago_rotate(self.current_game+1)
+        self.current_turn, self.vulnerability = logic.rotating.chicago_rotate(self.current_game)
                 
                 
 
@@ -868,19 +869,23 @@ class GameServer:
         # Advance turn
         self.advance_turn()
             
-            
-            
+        
+        
     def deal_cards(self):
         """Distribute cards among players"""
         
         # Shuffle cards
-        random.shuffle(self.card_list)
+        # random.shuffle(self.card_list)
         
-        # Allocate cards evenly -- 13 cards per player
+        # Generate random deal
+        deal = logic.dealing.generate_deal(0)
+        deal_dict = self.pbn_to_deal_dict(deal)
+        
+        # Allocate cards according to deal
         for i, card in enumerate(self.card_list):
             card.facing = "up"
             card.location = "hand"
-            card.owner = PLAYER_POSITIONS[i // 13]
+            card.owner = deal_dict[(card.suit, card.value)]
             
         # Increate current game by 1
         self.current_game += 1
@@ -891,8 +896,30 @@ class GameServer:
         # Send board state to clients
         self.broadcast()
         
+        
+        
+    def pbn_to_deal_dict(self, pbn_string):
+        """Converts a PBN hand string into a dictionary mapping card to position"""
+         
+        # N: am Anfang entfernen und Hände splitten
+        hands = pbn_string.split(':', 1)[1].split()
 
+        positions = ['north', 'east', 'south', 'west']
+        suits = ['spades', 'hearts', 'diamonds', 'clubs']
 
+        deal_dict = {}
+
+        for pos, hand in zip(positions, hands):
+            suit_parts = hand.split('.')
+
+            for suit, cards in zip(suits, suit_parts):
+                for card in cards:
+                    deal_dict[(suit, card)] = pos
+
+        return deal_dict           
+            
+     
+    
     def broadcast(self):
         """Send game state to all connected clients"""
         

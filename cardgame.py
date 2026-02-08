@@ -42,6 +42,9 @@ LOBBY_HEIGHT = 720
 LOBBY_TITLE = "Bridge: Lobby"
 LOBBY_SCALE = min(LOBBY_HEIGHT/1080, LOBBY_WIDTH/1920)
 
+# Visual appearance
+MAIN_COLOR = (17, 53, 65, 255)
+
 
 
 # ──[ Classes ]────────────────────────────────────────────────────────────────
@@ -202,7 +205,7 @@ class Game(arcade.View):
         self.player_position = position if position is not None else "north"
 
         # Play mat colour
-        self.background_color = self.background_color = (17, 53, 65) # arcade.color.ARSENIC
+        self.background_color = MAIN_COLOR # arcade.color.ARSENIC
         
         # Sound effects
         self.sound_slide = arcade.load_sound(r'assets/effects/slide.mp3')
@@ -568,7 +571,7 @@ class Game(arcade.View):
         for tile in self.tile_list:
             bid_ordinal = self.get_bid_ordinal(tile.level, tile.suit)
             if bid_ordinal <= contract_ordinal and tile.type == "normal":
-                tile.color = arcade.color.ARSENIC
+                tile.color = MAIN_COLOR
         
                 
         

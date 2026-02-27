@@ -14,6 +14,12 @@ import random
 import arcade.gui
 import pyperclip
 import ctypes
+from datetime import datetime
+import ctypes
+
+import warnings
+from arcade.exceptions import PerformanceWarning
+warnings.filterwarnings("ignore", category=PerformanceWarning)
 
 # ──[ Parameters ]─────────────────────────────────────────────────────────────
 
@@ -853,7 +859,7 @@ class Game(arcade.View):
                 ctypes.windll.user32.ShowWindow(hwnd, 9)
 
             # Switch to Lobby
-            menu_view = MenuView()
+            menu_view = GameOverView()
             self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
             self.window.set_caption(LOBBY_TITLE)
             self.window.show_view(menu_view)
@@ -1958,15 +1964,393 @@ class MenuView(arcade.View):
         except (FileNotFoundError, KeyError, json.JSONDecodeError):
             # Return defaults if file not found or corrupted
             return "", "", (0, 0)
-                         
+           
+
+
+# ──[ Game Over View ]─────────────────────────────────────────────────────────              
             
+class WaterfallBar():
+    def __init__(self, x, y, width, height, color, score, cumulative, pos, zero_y, gap, resize):
+          
+        # Attributes
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.color = color
+        self.score = score
+        self.cumulative = cumulative
+        self.pos = pos
+        self.zero_y = zero_y
+        self.gap = gap
+        self.resize = min(resize)
+        self.resize_x = resize[0]
+        self.resize_y = resize[1]
+        self.hover = False
+        self.left_neighbor_hover = False
+        self.play_sound = True
+        
+        # Sound
+        self.sound_drop = arcade.load_sound(r'assets/effects/drop.mp3')
+        
+        
+    def check_hover(self, mouse_x, mouse_y):
+        
+        # Hit box
+        left = self.x - self.width / 2
+        right = self.x + self.width / 2
+        bottom = self.y - abs(self.height) / 2
+        top = self.y + abs(self.height) / 2
+    
+        if left <= mouse_x <= right and bottom <= mouse_y <= top:
+            self.hover = True
+            
+            if self.play_sound:
+                arcade.play_sound(self.sound_drop)
+                self.play_sound = False
+        
+        else:
+            self.hover = False
+            self.play_sound = True
+            
+            
+    def draw(self):
+        
+        padding = 20 * self.resize
+        font_size = 16 * self.resize
+        
+        # Resize factor when enlarged
+        f = 1.2 if self.hover else 1
+        
+        # Resize bar
+        width, height = self.width*f, self.height*f
+
+        # Define recangle
+        bar_rect = arcade.XYWH(x=self.x,y=self.y,width=width,height=abs(height))
+            
+        # Draw bar
+        arcade.draw_rect_filled(bar_rect, self.color)
+        
+        # Draw outline
+        arcade.draw_rect_outline(bar_rect, arcade.color.WHITE, 2)
+        
+        # Draw score text
+        score_text = f"{'+' if self.score > 0 else ''}{self.score}"
+        arcade.draw_text(score_text, self.x, self.y,
+            font_size=font_size*f, color=arcade.color.WHITE, 
+            anchor_x="center", anchor_y="center", bold=True)
+        
+        # Draw connecting line
+        if self.pos > 0 and self.hover == False and self.left_neighbor_hover == False:
+            arcade.draw_line(self.x, self.y - self.height/2,
+                           self.x - self.width * 3/2, self.y - self.height/2,
+                           arcade.color.WHITE, 2)
+            
+        # Draw zero axis
+        actual_height = abs(height)
+        if self.hover:
+            actual_height = abs(height) + 4 * padding
+        bar_crosses_zero = (self.y - actual_height/2 <= self.zero_y <= self.y + actual_height/2)
+        if not bar_crosses_zero:
+            arcade.draw_line(self.x - self.gap/2, self.zero_y, self.x + self.gap/2, self.zero_y, arcade.color.WHITE, 2)
+            
+        # Draw additional information
+        if self.hover:
+            arcade.draw_text(f"{self.cumulative + self.score}", self.x, self.y + height/2 + padding * np.sign(height),
+                font_size=font_size*f, color=arcade.color.WHITE, 
+                anchor_x="center", anchor_y="center", bold=True)
+            arcade.draw_text(f"{self.cumulative}", self.x, self.y - height/2 - padding * np.sign(height),
+                font_size=font_size*f, color=arcade.color.WHITE, 
+                anchor_x="center", anchor_y="center", bold=True)
+
+
+    def get_info(self):
+        
+        if self.hover:
+            return {
+                "bid_played": "N3♠-1",
+                "bid_target": "N4♥=",
+            }
+        return None
+
+            
+
+class GameOverView(arcade.View):
+    def __init__(self):
+        super().__init__()
+        
+        # Load background
+        self.background = arcade.load_texture("assets/images/gameover.background.png")
+        
+        # Set modifier
+        self.ctrl_held = False
+        
+        # Mouse position
+        self.mouse_x = 0
+        self.mouse_y = 0
+        
+        # Init objects
+        self.bar_objects = list()
+        
+        # Overview element list
+        self.overview_elements = arcade.SpriteList()
+        
+        # Load sound effects
+        self.sound_drop = arcade.load_sound("assets/effects/drop.mp3")
+        self.sound_store = arcade.load_sound("assets/effects/store.mp3")
+        
+        # Create chart
+        self.create_waterfall_chart(self.window.width, self.window.height)
+        
+        # Scale
+        self.scale = min(self.window.width / 1920, self.window.height / 1080)
+
+        # Create board elements: Overview bids
+        image_path = r'assets/images/overview.bids.png'
+        self.overview_bids = BoardElement(image_path, self.scale)
+        self.overview_elements.append(self.overview_bids)
+        
+        # Create board elements: Overview result
+        image_path = r'assets/images/overview.result.png'
+        self.overview_result = BoardElement(image_path, self.scale)
+        self.overview_elements.append(self.overview_result)
+        
+        # Create board elements: Overview result
+        image_path = r'assets/images/overview.download.png'
+        self.overview_download = BoardElement(image_path, self.scale)
+        self.overview_elements.append(self.overview_download)
+        
+        self.on_resize(self.window.width, self.window.height)
+        
+        # Result
+        self.result = "DEFEAT"
+        
+    def create_waterfall_chart(self, window_width, window_height):
+        """Establishes a waterfall score chart"""
+        
+        # Set layout parameters
+        resize = window_width / 1920, window_height / 1080
+        padding = 150 * min(resize)
+        width = window_width - 2 * padding
+        height = window_height- 2 * padding
+        x_start, y_start = padding, padding
+        
+        # Example data
+        scores = [120, -50, -80, -140, 30, 90, -70, -110, 420, -50, -80, -140, 30, 90, -70, -300]
+        
+        # Cumulative score
+        cumulative = [0]
+        for score in scores:
+            cumulative.append(cumulative[-1] + score)
+        
+        # Set plot parameters
+        num_hands = len(scores)
+        bar_width = width / (num_hands) * 0.6
+        max_span = abs(max(cumulative)) + abs(min(cumulative))
+        scale = (height) / max_span
+        
+        # Zero axis
+        zero_y = y_start + abs(min(cumulative)) * scale
+        
+        # Create bars
+        for i in range(num_hands):
+            
+            # Coordinates (center)
+            gap = width / num_hands
+            bar_x = x_start + gap/2 + i * gap
+            bar_y = zero_y + (cumulative[i] + cumulative[i+1]) / 2 * scale
+        
+            # Color
+            if scores[i] > 0:
+                fill_color = (255, 255, 255, 77) # white
+            else:
+                fill_color = (255, 68, 68, 77) # red
+                
+            # Geometry
+            bar_height = scores[i] * scale
+            
+            # Create bar
+            bar = WaterfallBar(bar_x, bar_y, bar_width, bar_height, fill_color, scores[i], cumulative[i], i, zero_y, gap, resize)
+            self.bar_objects.append(bar)
+            
+    def on_update(self, delta_time):
+        
+        # Check if bar is hovered
+        for bar in self.bar_objects:
+            bar.check_hover(self.mouse_x, self.mouse_y)
+            
+        # Check if left bar is hovered
+        for i, bar in enumerate(self.bar_objects):
+            if i > 0:  # Nicht für den ersten Bar
+                bar.left_neighbor_hover = self.bar_objects[i-1].hover
+            else:
+                bar.left_neighbor_hover = False
+                
+
+    def on_draw(self):
+        self.clear()
+        
+        # Draw background
+        rect = arcade.LBWH(left=0, bottom=0, width=self.window.width, height=self.window.height)
+        arcade.draw_texture_rect(texture=self.background,rect=rect)
+        
+        # Draw bars
+        for bar in self.bar_objects:
+            bar.draw()
+            
+        # Hover info (nur einer kann gleichzeitig gehovered sein)
+        for bar in self.bar_objects:
+            info = bar.get_info()
+            if info:
+                text = arcade.Text(info["bid_played"],
+                    x=self.overview_bids.center_x - 100*self.scale, y= self.overview_bids.center_y,
+                    color=arcade.color.WHITE, font_size=24*self.scale,
+                    font_name="Courier New", anchor_x="center", anchor_y="center", bold=True)
+                text.draw()
+                text = arcade.Text(info["bid_target"],
+                    x=self.overview_bids.center_x + 100*self.scale, y= self.overview_bids.center_y,
+                    color=arcade.color.WHITE, font_size=24*self.scale,
+                    font_name="Courier New", anchor_x="center", anchor_y="center", bold=True)
+                text.draw()
+                break  # nur einmal zeichnen
+            
+        # Draw overview elements
+        self.overview_elements.draw()
+        
+        # Draw result
+        text = arcade.Text(
+            self.result,
+            x=self.window.width/2, y=self.window.height-75*self.scale,
+            color=arcade.color.WHITE,
+            font_size=24*self.scale, font_name="Courier New",
+            anchor_x="center", anchor_y="center",
+            align="center", rotation=0, bold=True
+        )
+        text.draw()    
+            
+        # Draw info text
+        text = arcade.Text(
+            "GANYMED-KALLISTO (NS) vs. ISIS-OSIRIS (EW)",
+            x=50*self.scale, y=self.window.height-50*self.scale,
+            color=arcade.color.WHITE,
+            font_size=16*self.scale, font_name="Courier New",
+            anchor_x="left", anchor_y="top",
+            align="center", rotation=0, bold=True
+        )
+        text.draw()
+        
+        # Draw date
+        text = arcade.Text(
+            datetime.today().strftime('%Y-%m-%d'),
+            x=50*self.scale, y=self.window.height-80*self.scale,
+            color=arcade.color.WHITE,
+            font_size=16*self.scale, font_name="Courier New",
+            anchor_x="left", anchor_y="top",
+            align="center", rotation=0, bold=True
+        )
+        text.draw()
+        
+        # Draw axis label
+        text = "CUMULATIVE DOUBLE DUMMY SCORE DELTA"
+        arcade.draw_text(text, 100 * self.scale, self.window.height/2,
+            font_size=16 * self.scale, color=arcade.color.WHITE, 
+            anchor_x="center", anchor_y="center", bold=True, rotation=-90)
+        
+        # Write player name
+
+        
+        
+  
+    def on_resize(self, width, height):
+        
+        # Rescale
+        self.scale = min(width / 1920, height / 1080)
+
+        # Re-create waterfall chart
+        self.bar_objects = list()
+        self.create_waterfall_chart(self.window.width, self.window.height)
+        
+        # Position overview elements: Bids
+        self.overview_bids.position = self.window.width/2, 75*self.scale
+        self.overview_bids.scale = self.scale
+        
+        # Position overview elements: Result
+        self.overview_result.position = self.window.width/2, self.window.height - 75*self.scale
+        self.overview_result.scale = self.scale
+        
+        # Position overview elements: Result
+        self.overview_download.position = self.window.width - 80*self.scale, self.window.height - 75*self.scale
+        self.overview_download.scale = self.scale
+        
+        
+        
+        
+    def on_mouse_motion(self, x, y, dx, dy):
+        
+        # Update mouse position
+        self.mouse_x = x
+        self.mouse_y = y
+        
+        # Set cursor type to "hand" if hovering above download button
+        btn = self.overview_download
+        if (btn.left <= x <= btn.right and
+                btn.bottom <= y <= btn.top):
+            cursor_type = self.window.CURSOR_HAND
+            btn.scale = self.scale * 1.2
+        else:
+            cursor_type = self.window.CURSOR_DEFAULT
+            btn.scale = self.scale
+            
+        self.window.set_mouse_cursor(self.window.get_system_mouse_cursor(cursor_type))
+        
+        
+    def is_mouse_over_bar(self, bar_x, bar_y, bar_width, bar_height):
+        
+        return (bar_x - bar_width/2 <= self.mouse_x <= bar_x + bar_width/2 and 
+                bar_y - bar_height/2 <= self.mouse_y <= bar_y + bar_height/2)
+    
+    
+    def on_mouse_press(self, x, y, button, modifiers):
+        
+        # Download record
+        btn = self.overview_download
+        if (btn.left <= x <= btn.right and
+                btn.bottom <= y <= btn.top):
+            
+            #Play sound
+            arcade.play_sound(self.sound_store)
+            
+            # Save pbn
+            scores = [120, -50, -80, -140, 30, 90, -70, -110, 420, -50, -80, -140, 30, 90, -70, -300]
+            filename = "saves/records/" + datetime.today().strftime('%Y-%m-%d_%H-%M') + ".json"
+            with open(filename, "w") as f:
+                json.dump({"scores": scores}, f)
+            
+            
+        
+    def on_key_press(self, key, _modifiers):
+        """ Handle keypresses. """
+        
+        # Set modifier
+        if key == arcade.key.LCTRL:
+            self.ctrl_held = True
+        
+        # Return to lobby
+        if key == arcade.key.ESCAPE and self.ctrl_held == False:
+
+            menu_view = MenuView()
+            self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+            self.window.set_caption(LOBBY_TITLE)
+            self.window.show_view(menu_view)
+        
+        
 
 # ──[ Main ]───────────────────────────────────────────────────────────────────
 
 def main():
     """ Main function """
-    window = arcade.Window(LOBBY_WIDTH, LOBBY_HEIGHT, LOBBY_TITLE, resizable=True)
-    menu_view = MenuView()  # Start with menu view
+    window = arcade.Window(LOBBY_WIDTH, LOBBY_HEIGHT, LOBBY_TITLE, resizable=True, antialiasing=True)
+    menu_view = GameOverView()  # Start with menu view
     window.show_view(menu_view)
     arcade.run()
 

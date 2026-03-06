@@ -2350,7 +2350,7 @@ class GameOverView(arcade.View):
 def main():
     """ Main function """
     window = arcade.Window(LOBBY_WIDTH, LOBBY_HEIGHT, LOBBY_TITLE, resizable=True, antialiasing=True)
-    menu_view = GameOverView()  # Start with menu view
+    menu_view = MenuView()  # Start with menu view
     window.show_view(menu_view)
     arcade.run()
 

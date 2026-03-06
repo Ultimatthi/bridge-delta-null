@@ -8,7 +8,6 @@ import pickle
 import time
 import random
 import logic.scoring
-import logic.rotating
 import logic.dealing
 
 
@@ -130,6 +129,9 @@ class GameServer:
         self.dummy_position = None
         self.declarer_position = None
         
+        # Game session with all boards
+        self.session = []
+        
         # Sprite list with all the cards
         self.card_list = []
         
@@ -151,6 +153,10 @@ class GameServer:
         # Set total number of games (user input)
         total_games_input = input("Enter total number of deals for this session (press Enter for default 16): ").strip()
         self.total_games = 16 if not total_games_input else int(total_games_input)
+        
+        # Create boards
+        self.session = logic.dealing.create_session(self.total_games)
+        logic.dealing.write_pbn_file(self.session, 'test.txt')
         
         s.bind((host, port))
         s.listen(5)
@@ -455,8 +461,11 @@ class GameServer:
         # Advance game
         self.game_phase = "dealing"
         
-        # Rotate dealer and vulnerability
-        self.current_turn, self.vulnerability = logic.rotating.chicago_rotate(self.current_game)
+        # Rotate dealer
+        self.current_turn = self.session[self.current_game].dealer
+        
+        # Rotate vulnerability
+        self.vulnerability = self.session[self.current_game].vul
                 
                 
 
@@ -878,7 +887,12 @@ class GameServer:
         # random.shuffle(self.card_list)
         
         # Generate random deal
-        deal = logic.dealing.generate_deal(0)
+        # deal = logic.dealing.generate_deal(0)
+        
+        # Select deal from session
+        deal = self.session[self.current_game].deal
+        
+        # Parse deal
         deal_dict = self.pbn_to_deal_dict(deal)
         
         # Allocate cards according to deal

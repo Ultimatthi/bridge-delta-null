@@ -63,6 +63,7 @@ class Layout:
 
     def update(self, width: int, height: int):
         
+        
         resize = min(height / 1080, width / 1920)
         
         self.width = width
@@ -163,7 +164,7 @@ class BoardElement(arcade.Sprite):
         self.image_file_name = image_path
 
         # Call the parent
-        super().__init__(self.image_file_name, scale, hit_box_algorithm = 'None')
+        super().__init__(self.image_file_name, scale, hit_box_algorithm = "None")
         
         
 
@@ -393,31 +394,31 @@ class Game(arcade.View):
         self.bidding_grid.position = x, y
         
         # Create bidding elements: Strips
-        image_path = r'assets/images/bidding.strip.png'
+        image_path = r'assets/images/bidding.strip.bottom.png'
         self.bidding_strip_bottom = BoardElement(image_path, self.layout.scale)
         x = self.layout.width/2
-        y = self.layout.height/2 - 245*self.layout.scale
+        y = self.layout.height/2 - 240*self.layout.scale
         self.bidding_strip_bottom.position = x, y
         
         # Create bidding elements: Strips
-        image_path = r'assets/images/bidding.strip.png'
+        image_path = r'assets/images/bidding.strip.top.png'
         self.bidding_strip_top = BoardElement(image_path, self.layout.scale)
         x = self.layout.width/2
         y = self.layout.height/2 + 320*self.layout.scale
         self.bidding_strip_top.position = x, y
         
         # Create bidding elements: Strips
-        image_path = r'assets/images/bidding.strip.png'
+        image_path = r'assets/images/bidding.strip.left.png'
         self.bidding_strip_left = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width/2 - 530*self.layout.scale
+        x = 240*self.layout.scale
         y = self.layout.height/2
         self.bidding_strip_left.position = x, y
         
         # Create bidding elements: Strips
-        image_path = r'assets/images/bidding.strip.png'
+        image_path = r'assets/images/bidding.strip.right.png'
         self.bidding_strip_right = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width/2 + 530*self.layout.scale
-        y = self.layout.height/2
+        x = self.layout.width - 240*self.layout.scale
+        y = self.layout.height/2 + 10*self.layout.scale
         self.bidding_strip_right.position = x, y
         
         # Create bidding elements: HCP pad
@@ -592,21 +593,6 @@ class Game(arcade.View):
             # Draw board elements
             self.board_elements.draw()
             
-            # Draw bidding elements
-            if self.game_phase == "bidding":
-                
-                # Draw bidding elements
-                self.bidding_elements.draw()
-                
-                # Draw bidding tiles
-                self.tile_list.draw()
-                
-                # Annotations
-                self.annotate_bidding()
-            
-            # Annotations
-            self.annotate()
-            
             # Texture overlay
             self.texture_elements.draw()
             
@@ -618,6 +604,22 @@ class Game(arcade.View):
             
             # Draw card overlay
             self.draw_card_overlay()
+            
+            # Draw bidding elements
+            if self.game_phase == "bidding":
+                
+                # Draw bidding elements
+                self.bidding_elements.draw()
+                
+                # Draw bidding tiles
+                self.tile_list.draw()
+                
+                # Annotations
+                self.annotate_bidding()
+                
+            # Annotations
+            self.annotate()
+            
             
         self.light_layer.draw()
         
@@ -1454,62 +1456,58 @@ class Game(arcade.View):
         
     def annotate_bidding(self):
             
-        # Bidding text
-        for player in self.player_list:
+        # Create bid
+        for i, bid in enumerate(self.bidding_history):
+
+            # Create bidding text
+            label = self.convert_bid_to_symbol(bid)
             
-            # Init 3 diffently colored texts that are stacked to one single text later
-            label_white = ""
-            label_red = ""
-            label_beige = ""
-            
-            # Create text for each player
-            for bid in self.bidding_history:
-                if bid.player == player.position:
-                    symbol = self.convert_bid_to_symbol(bid)
-                    
-                    # Add delimiter
-                    if label_white + label_red + label_beige != "":
-                        label_white += "·"
-                        label_red += " "
-                        label_beige += " "
-            
-                    # Add symbol
-                    if bid.suit in ["clubs", "spades"] or bid.type == "pass":
-                        label_white += symbol
-                        label_red += " " * len(symbol)
-                        label_beige += " " * len(symbol)
-                    elif bid.suit in ["diamonds", "hearts"] or bid.type == "double":
-                        label_white += " " * len(symbol)
-                        label_red += symbol
-                        label_beige += " " * len(symbol)
-                    else:
-                        label_white += " " * len(symbol)
-                        label_red += " " * len(symbol)
-                        label_beige += symbol
-                    
             # Get relative board position
-            rel_position = self.get_display_position(self.player_position, player.position)
+            rel_position = self.get_display_position(self.player_position, bid.player)
+            
+            # Get relative position on player's bidding strip
+            strip_position = int(np.floor(i/4))
+            
+            # Define color
+            if bid.type == 'pass':
+                color = [125, 179, 141] # green
+            elif bid.suit in ('clubs', 'spades'):
+                color = [255, 255, 255] # white
+            elif bid.suit == 'notrump':
+                color = [255, 204, 170] # beige
+            else:
+                color = [188, 107, 104] # red
+            
             # Set bidding location
             if rel_position == "bottom":
-                x = self.bidding_strip_bottom.center_x
+                x = self.bidding_strip_bottom.right - 90*self.layout.scale * (1 + strip_position)
                 y = self.bidding_strip_bottom.center_y
             elif rel_position == "top":
-                x = self.bidding_strip_top.center_x
+                x = self.bidding_strip_top.left + 90*self.layout.scale * (1 + strip_position)
                 y = self.bidding_strip_top.center_y
             elif rel_position == "left":
                 x = self.bidding_strip_left.center_x
-                y = self.bidding_strip_left.center_y
+                y = self.bidding_strip_left.bottom + 65*self.layout.scale * (1 + strip_position)
             elif rel_position == "right":
                 x = self.bidding_strip_right.center_x
-                y = self.bidding_strip_right.center_y
+                y = self.bidding_strip_right.top - 65*self.layout.scale * (1 + strip_position)
+                
             # Draw bidding text
-            text_white = self.annotate_text(label_white, x, y, 0, 30, [255, 255, 255])
-            text_red = self.annotate_text(label_red, x, y, 0, 30, [173, 54, 50])
-            text_beige = self.annotate_text(label_beige, x, y, 0, 30, [255, 204, 170])
-            text_white.draw()
-            text_red.draw()
-            text_beige.draw()
-
+            if bid.suit == 'notrump' and len(label) > 1:
+                # Split number and "NT" into two separate text elements
+                number_part = label[0]        # e.g. "3"
+                nt_part = label[1:]           # e.g. "NT"
+                
+                # Draw the number larger
+                text_number = self.annotate_text(number_part, x - 16 * self.layout.scale, y, 0, 30, color)
+                text_number.draw()
+                
+                # Draw "NT" smaller, offset to the right
+                text_nt = self.annotate_text(nt_part, x + 10 * self.layout.scale, y - 2 * self.layout.scale, 0, 20, color)
+                text_nt.draw()
+            else:
+                text = self.annotate_text(label, x, y, 0, 30, color)
+                text.draw()
 
             
     def convert_bid_to_symbol(self, bid):

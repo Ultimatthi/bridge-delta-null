@@ -113,12 +113,14 @@ class Card(arcade.Sprite):
 class Tile(arcade.Sprite):
     """ Bid sprite """
     
-    def __init__(self, suit, level, bid_type, scale):
+    def __init__(self, suit, level, bid_type, scale, i=0, j=0):
         
         # Attributes
         self.level = level
         self.suit = suit
         self.type = bid_type
+        self.i = i
+        self.j = j
         
         # Image
         if bid_type == "normal":
@@ -129,11 +131,11 @@ class Tile(arcade.Sprite):
         # Call the parent
         super().__init__(self.image, scale, hit_box_algorithm="None")
         
-    def set_position_by_index(self, i, j, layout):
+    def set_position_by_index(self, layout):
 
         if self.type == "normal":
-            self.center_x = layout.width / 2 - 150 * layout.scale + i * 75 * layout.scale
-            self.center_y = layout.height / 2 - 85 * layout.scale + j * 50 * layout.scale
+            self.center_x = layout.width / 2 - 150 * layout.scale + self.i * 75 * layout.scale
+            self.center_y = layout.height / 2 - 85 * layout.scale + self.j * 50 * layout.scale
         elif self.type == "pass":
             self.center_x = layout.width / 2 - 112.5*layout.scale
             self.center_y = layout.height / 2 - 135*layout.scale
@@ -311,25 +313,22 @@ class Game(arcade.View):
         for card_suit in CARD_SUITS:
             for card_value in CARD_VALUES:
                 card = Card(card_suit, card_value, "up", None, None, self.layout.scale)
-                card.position = self.layout.width/2, self.layout.height/2
                 card.angle = random.uniform(-5, 5)
                 self.card_list.append(card)
                 
         # Create every normal tile
         for i, tile_suit in enumerate(TILE_SUITS):
             for j, tile_level in enumerate(TILE_LEVELS):
-                tile = Tile(tile_suit, tile_level, "normal", self.layout.scale)
-                tile.set_position_by_index(i, j, self.layout)
+                tile = Tile(tile_suit, tile_level, "normal", self.layout.scale, i, j)
+                card.position = self.layout.width/2, self.layout.height/2
                 self.tile_list.append(tile)
                 
         # Create pass tile
         tile = Tile(None, None, "pass", self.layout.scale)
-        tile.set_position_by_index(0, 0, self.layout)
         self.tile_list.append(tile)  
         
         # Create double tile
         tile = Tile(None, None, "double", self.layout.scale)
-        tile.set_position_by_index(0, 0, self.layout)
         self.tile_list.append(tile)  
         
         # Create every player
@@ -337,112 +336,76 @@ class Game(arcade.View):
             name = str(position)
             player = Player(name, position)
             self.player_list.append(player)
-            
+
+        
         # Create board elements: Border 
         image_path = r'assets/images/board.border.png'
         self.board_border = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width/2
-        y = self.layout.height/2
-        self.board_border.position = x, y
+        self.board_elements.append(self.board_border)
               
         # Create board elements: Scoring area
         image_path = r'assets/images/board.scoring.png'
         self.board_scoring = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width - 60 * self.layout.scale - self.board_scoring.width/2
-        y = self.layout.height - 60 * self.layout.scale - self.board_scoring.height/2
-        self.board_scoring.position = x, y
+        self.board_elements.append(self.board_scoring)
         
         # Create board elements: Contract area
         image_path = r'assets/images/board.contract.png'
         self.board_contract = BoardElement(image_path, self.layout.scale)
-        x = 60 * self.layout.scale + self.board_contract.width/2
-        y = self.layout.height - 60 * self.layout.scale - self.board_contract.height/2
-        self.board_contract.position = x, y
+        self.board_elements.append(self.board_contract)
         
         # Create board elements: Trick area (won)
         image_path = r'assets/images/board.tricks.won.png'
         self.board_tricks_won = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width - 60 * self.layout.scale - self.board_tricks_won.width/2
-        y = 60 * self.layout.scale + self.board_tricks_won.height/2
-        self.board_tricks_won.position = x, y
+        self.board_elements.append(self.board_tricks_won)
 
         # Create board elements: Trick area (lost)
         image_path = r'assets/images/board.tricks.lost.png'
         self.board_tricks_lost = BoardElement(image_path, self.layout.scale)
-        x = 60 * self.layout.scale + self.board_tricks_lost.width/2
-        y = 60 * self.layout.scale + self.board_tricks_lost.height/2
-        self.board_tricks_lost.position = x, y
-          
-        # Add to board element list
-        self.board_elements.append(self.board_border)
-        self.board_elements.append(self.board_scoring)
-        self.board_elements.append(self.board_contract)
-        self.board_elements.append(self.board_tricks_won)
         self.board_elements.append(self.board_tricks_lost)
-        
+
         # Create texture element: Texture
         image_path =  r'assets/images/board.texture.png'
         self.board_texture = BoardElement(image_path, self.layout.scale)
-        self.board_texture.position = self.layout.width/2, self.layout.height/2
         self.texture_elements.append(self.board_texture)
         
         # Create bidding elements: Grid
         image_path = r'assets/images/bidding.grid.png'
         self.bidding_grid = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width/2
-        y = self.layout.height/2 + 40*self.layout.scale
-        self.bidding_grid.position = x, y
+        self.bidding_elements.append(self.bidding_grid)
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.bottom.png'
         self.bidding_strip_bottom = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width/2
-        y = self.layout.height/2 - 240*self.layout.scale
-        self.bidding_strip_bottom.position = x, y
+        self.bidding_elements.append(self.bidding_strip_bottom)
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.top.png'
         self.bidding_strip_top = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width/2
-        y = self.layout.height/2 + 320*self.layout.scale
-        self.bidding_strip_top.position = x, y
+        self.bidding_elements.append(self.bidding_strip_top)
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.left.png'
         self.bidding_strip_left = BoardElement(image_path, self.layout.scale)
-        x = 240*self.layout.scale
-        y = self.layout.height/2
-        self.bidding_strip_left.position = x, y
+        self.bidding_elements.append(self.bidding_strip_left)
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.right.png'
         self.bidding_strip_right = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width - 240*self.layout.scale
-        y = self.layout.height/2 + 10*self.layout.scale
-        self.bidding_strip_right.position = x, y
+        self.bidding_elements.append(self.bidding_strip_right)
         
         # Create bidding elements: HCP pad
         image_path = r'assets/images/hcp.overlay.png'
         self.hcp_overlay = BoardElement(image_path, self.layout.scale)
-        x = self.layout.width/2
-        y = 30*self.layout.scale
-        self.hcp_overlay.position = x, y
-        
-        # Add to bidding element list
-        self.bidding_elements.append(self.bidding_grid)
         self.bidding_elements.append(self.hcp_overlay)
-        self.bidding_elements.append(self.bidding_strip_bottom)
-        self.bidding_elements.append(self.bidding_strip_top)
-        self.bidding_elements.append(self.bidding_strip_left)
-        self.bidding_elements.append(self.bidding_strip_right)
         
         # Create overlay elements: Card halo
         image_path = r'assets/images/card.halo.png'
         self.card_halo = BoardElement(image_path, self.layout.scale)
         self.card_halo.position = -999, -999
-        
-        # Add to overlay element list
         self.cardoverlay_elements.append(self.card_halo)
+        
+        # Layout elements
+        self.layout_elements()
         
         # Connect to socket
         try:
@@ -468,6 +431,84 @@ class Game(arcade.View):
         self.recv_thread = threading.Thread(target=self.receive_state, daemon=True)
         self.recv_thread.start()
         
+        
+    def layout_elements(self):
+            
+            # Tiles
+            for tile in self.tile_list:
+                tile.scale = self.layout.scale # Erst Größe festlegen
+                tile.set_position_by_index(self.layout) # Dann Position (nutzt intern evtl. die neue Größe)
+                
+            # Board element: Border (Stretching)
+            self.board_border.width = self.layout.width - 60 * self.layout.scale
+            self.board_border.height = self.layout.height - 60 * self.layout.scale
+            # Dann positionieren
+            self.board_border.position = self.layout.width / 2, self.layout.height / 2
+                  
+            # Board element: Scoring area
+            self.board_scoring.scale = self.layout.scale
+            x = self.layout.width - 60 * self.layout.scale - self.board_scoring.width / 2
+            y = self.layout.height - 60 * self.layout.scale - self.board_scoring.height / 2
+            self.board_scoring.position = x, y
+            
+            # Board element: Contract area
+            self.board_contract.scale = self.layout.scale
+            x = 60 * self.layout.scale + self.board_contract.width / 2
+            y = self.layout.height - 60 * self.layout.scale - self.board_contract.height / 2
+            self.board_contract.position = x, y
+            
+            # Board element: Trick area (won)
+            self.board_tricks_won.scale = self.layout.scale
+            x = self.layout.width - 60 * self.layout.scale - self.board_tricks_won.width / 2
+            y = 60 * self.layout.scale + self.board_tricks_won.height / 2
+            self.board_tricks_won.position = x, y
+    
+            # Board element: Trick area (lost)
+            self.board_tricks_lost.scale = self.layout.scale
+            x = 60 * self.layout.scale + self.board_tricks_lost.width / 2
+            y = 60 * self.layout.scale + self.board_tricks_lost.height / 2
+            self.board_tricks_lost.position = x, y
+            
+            # Texture element: Texture
+            self.board_texture.scale = self.layout.scale
+            self.board_texture.position = self.layout.width / 2, self.layout.height / 2
+            
+            # Bidding elements: Grid
+            self.bidding_grid.scale = self.layout.scale
+            x = self.layout.width / 2
+            y = self.layout.height / 2 + 40 * self.layout.scale
+            self.bidding_grid.position = x, y
+            
+            # Bidding elements: Strips (Bottom)
+            self.bidding_strip_bottom.scale = self.layout.scale
+            x = self.layout.width / 2
+            y = self.layout.height / 2 - 240 * self.layout.scale
+            self.bidding_strip_bottom.position = x, y
+            
+            # Bidding elements: Strips (Top)
+            self.bidding_strip_top.scale = self.layout.scale
+            x = self.layout.width / 2
+            y = self.layout.height / 2 + 320 * self.layout.scale
+            self.bidding_strip_top.position = x, y
+            
+            # Bidding elements: Strips (Left)
+            self.bidding_strip_left.scale = self.layout.scale
+            x = 240 * self.layout.scale
+            y = self.layout.height / 2
+            self.bidding_strip_left.position = x, y
+            
+            # Bidding elements: Strips (Right)
+            self.bidding_strip_right.scale = self.layout.scale
+            x = self.layout.width - 240 * self.layout.scale
+            y = self.layout.height / 2 + 10 * self.layout.scale
+            self.bidding_strip_right.position = x, y
+            
+            # Bidding elements: HCP pad
+            self.hcp_overlay.scale = self.layout.scale
+            x = self.layout.width / 2
+            y = 30 * self.layout.scale
+            self.hcp_overlay.position = x, y
+            
         
     def create_light(self):
         
@@ -498,38 +539,9 @@ class Game(arcade.View):
         # Update layout variables
         self.layout.update(width, height)
         
-        # All sprite collections that need single scale rescaling
-        sprite_collections = [
-            self.board_elements,
-            self.bidding_elements, 
-            self.texture_elements,
-            self.cardoverlay_elements,
-            self.tile_list,
-            self.card_list
-        ]
+        # Layout elements
+        self.layout_elements()
         
-        # Rescale and reposition all sprites
-        for collection in sprite_collections:
-            for sprite in collection:
-                # Rescale position
-                sprite.center_x *= resize_x
-                sprite.center_y *= resize_y
-                # Rescale sprite
-                if sprite == self.board_border:
-                    sprite.scale_x *= resize_x
-                    sprite.scale_y *= resize_y
-                else:
-                    sprite.scale = self.layout.scale
-        
-        # Rescale bidding tiles
-        for tile in self.tile_list:
-            if tile.type == "normal":
-                suit_index = TILE_SUITS.index(tile.suit)
-                level_index = TILE_LEVELS.index(tile.level)
-                tile.set_position_by_index(suit_index, level_index, self.layout)
-            else:
-                tile.set_position_by_index(0, 0, self.layout)
-
         # Rescale light source
         self.create_light()
             
@@ -861,7 +873,7 @@ class Game(arcade.View):
                 ctypes.windll.user32.ShowWindow(hwnd, 9)
 
             # Switch to Lobby
-            menu_view = GameOverView()
+            menu_view = MenuView()
             self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
             self.window.set_caption(LOBBY_TITLE)
             self.window.show_view(menu_view)
@@ -1316,6 +1328,7 @@ class Game(arcade.View):
         # Position halo
         self.card_halo.position = winning_card.position
         self.card_halo.angle = winning_card.angle
+        self.card_halo.scale = self.layout.scale
 
         # Draw halo
         self.cardoverlay_elements.draw()

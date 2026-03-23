@@ -2,23 +2,30 @@
 Bridge: Client
 """
 
-import arcade
-from arcade.future.light import Light, LightLayer
+# Standard library
+import ctypes
+import json
+import pickle
+import random
+import re
 import socket
 import threading
-import pickle
-import json
 import time
-import numpy as np
-import random
-import arcade.gui
-import pyperclip
-import ctypes
-from datetime import datetime
-import ctypes
-
 import warnings
+from datetime import datetime
+
+# Third-party
+import numpy as np
+import pyperclip
+import arcade
+import arcade.gui
 from arcade.exceptions import PerformanceWarning
+from arcade.future.light import Light, LightLayer
+
+# Local
+import logic.dealing
+
+# Warning filters
 warnings.filterwarnings("ignore", category=PerformanceWarning)
 
 # ──[ Parameters ]─────────────────────────────────────────────────────────────
@@ -42,11 +49,14 @@ BID_TYPES = ["pass", "double", "normal"]
 TILE_LEVELS = [1, 2, 3, 4, 5, 6, 7]
 TILE_SUITS = ["clubs", "diamonds", "hearts", "spades", "notrump"]
 
-# Lobby dimensions
+# Lobby parameters
 LOBBY_WIDTH = 1280
 LOBBY_HEIGHT = 720
 LOBBY_TITLE = "Bridge: Lobby"
 LOBBY_SCALE = min(LOBBY_HEIGHT/1080, LOBBY_WIDTH/1920)
+
+# Game Overview parameters
+GAMEOVERVIEW_TITLE = "Bridge: Game Overview"
 
 # Visual appearance
 MAIN_COLOR = (17, 53, 65, 255)
@@ -591,6 +601,14 @@ class Game(arcade.View):
             bid_ordinal = self.get_bid_ordinal(tile.level, tile.suit)
             if bid_ordinal <= contract_ordinal and tile.type == "normal":
                 tile.color = MAIN_COLOR
+                
+        # End game
+        if self.game_phase == "finished":
+            
+            # Switch to GameOverView
+            gameover_view = GameOverView(self.session)
+            self.window.set_caption(GAMEOVERVIEW_TITLE)
+            self.window.show_view(gameover_view)
         
                 
         
@@ -930,7 +948,7 @@ class Game(arcade.View):
         
         while self.running:
             try:
-                data = self.socket.recv(4096)
+                data = self.socket.recv(8192)
                 self.update_state(data)
             except:
                 print("Connection lost")
@@ -958,6 +976,7 @@ class Game(arcade.View):
         self.vulnerability = game_state.get("vulnerability")
         self.dummy_position = game_state.get("dummy_position")
         self.declarer_position = game_state.get("declarer_position")
+        self.session = game_state.get("session")
         
         # Play sound
         sound = game_state.get("sound")
@@ -1454,7 +1473,7 @@ class Game(arcade.View):
         # Scoring: Games
         x = self.board_scoring.right - 55*self.layout.scale
         y = self.board_scoring.bottom + 120*self.layout.scale
-        value = f"{self.current_game}/{self.total_games}"
+        value = f"{(self.current_game or 0)+1}/{self.total_games}"
         text = self.annotate_state_text(value, 16, x, y, 0, 22*self.layout.scale)
         text.draw()
         
@@ -1981,7 +2000,7 @@ class MenuView(arcade.View):
 # ──[ Game Over View ]─────────────────────────────────────────────────────────              
             
 class WaterfallBar():
-    def __init__(self, x, y, width, height, color, score, cumulative, pos, zero_y, gap, resize):
+    def __init__(self, x, y, width, height, color, score, cumulative, contract, par_contract, pos, zero_y, gap, resize):
           
         # Attributes
         self.x = x
@@ -1989,8 +2008,10 @@ class WaterfallBar():
         self.width = width
         self.height = height
         self.color = color
-        self.score = score
+        self.score = score # delta score
         self.cumulative = cumulative
+        self.contract = contract
+        self.par_contract = par_contract
         self.pos = pos
         self.zero_y = zero_y
         self.gap = gap
@@ -2000,6 +2021,7 @@ class WaterfallBar():
         self.hover = False
         self.left_neighbor_hover = False
         self.play_sound = True
+        self.par_cycle = 0
         
         # Sound
         self.sound_drop = arcade.load_sound(r'assets/effects/drop.mp3')
@@ -2074,21 +2096,30 @@ class WaterfallBar():
                 font_size=font_size*f, color=arcade.color.WHITE, 
                 anchor_x="center", anchor_y="center", bold=True)
 
-
     def get_info(self):
         
         if self.hover:
+            i = self.par_cycle % len(self.par_contract)
             return {
-                "bid_played": "N3♠-1",
-                "bid_target": "N4♥=",
+                "bid_played": self.parse_contract(self.contract) or "—",
+                "bid_target": self.parse_contract(self.par_contract[i]) or "—",
             }
         return None
+    
+    def parse_contract(self, contract):
+        match = re.match(r"(\d+(?:NT|[♠♥♦♣]))([NESW])(x{1,2})?(.+)", contract)
+        contract, player, double, result = match.groups()
+        dbl = double if double else ""
+        return f"{player}|{contract}{dbl}|{result}"
 
             
 
 class GameOverView(arcade.View):
-    def __init__(self):
+    def __init__(self, session):
         super().__init__()
+        
+        # Session
+        self.session = session
         
         # Load background
         self.background = arcade.load_texture("assets/images/gameover.background.png")
@@ -2141,13 +2172,16 @@ class GameOverView(arcade.View):
         
         # Set layout parameters
         resize = window_width / 1920, window_height / 1080
-        padding = 150 * min(resize)
-        width = window_width - 2 * padding
-        height = window_height- 2 * padding
-        x_start, y_start = padding, padding
+        padding_x = 150 * min(resize)
+        padding_y = 200 * min(resize)
+        width = window_width - 2 * padding_x
+        height = window_height- 2 * padding_y
+        x_start, y_start = padding_x, padding_y
         
-        # Example data
-        scores = [120, -50, -80, -140, 30, 90, -70, -110, 420, -50, -80, -140, 30, 90, -70, -300]
+        # Session data
+        scores = [board.par_score for board in self.session]
+        contracts = [board.contract for board in self.session]
+        par_contracts = [board.par_contract for board in self.session]
         
         # Cumulative score
         cumulative = [0]
@@ -2181,7 +2215,7 @@ class GameOverView(arcade.View):
             bar_height = scores[i] * scale
             
             # Create bar
-            bar = WaterfallBar(bar_x, bar_y, bar_width, bar_height, fill_color, scores[i], cumulative[i], i, zero_y, gap, resize)
+            bar = WaterfallBar(bar_x, bar_y, bar_width, bar_height, fill_color, scores[i], cumulative[i], contracts[i], par_contracts[i], i, zero_y, gap, resize)
             self.bar_objects.append(bar)
             
     def on_update(self, delta_time):
@@ -2214,12 +2248,12 @@ class GameOverView(arcade.View):
             info = bar.get_info()
             if info:
                 text = arcade.Text(info["bid_played"],
-                    x=self.overview_bids.center_x - 100*self.scale, y= self.overview_bids.center_y,
+                    x=self.overview_bids.center_x - 115*self.scale, y= self.overview_bids.center_y,
                     color=arcade.color.WHITE, font_size=24*self.scale,
                     font_name="Courier New", anchor_x="center", anchor_y="center", bold=True)
                 text.draw()
                 text = arcade.Text(info["bid_target"],
-                    x=self.overview_bids.center_x + 100*self.scale, y= self.overview_bids.center_y,
+                    x=self.overview_bids.center_x + 115*self.scale, y= self.overview_bids.center_y,
                     color=arcade.color.WHITE, font_size=24*self.scale,
                     font_name="Courier New", anchor_x="center", anchor_y="center", bold=True)
                 text.draw()
@@ -2332,11 +2366,14 @@ class GameOverView(arcade.View):
             arcade.play_sound(self.sound_store)
             
             # Save pbn
-            scores = [120, -50, -80, -140, 30, 90, -70, -110, 420, -50, -80, -140, 30, 90, -70, -300]
-            filename = "saves/records/" + datetime.today().strftime('%Y-%m-%d_%H-%M') + ".json"
-            with open(filename, "w") as f:
-                json.dump({"scores": scores}, f)
+            filename = "saves/records/" + datetime.today().strftime('%Y-%m-%dT%H-%M') + ".pbn"
+            logic.dealing.write_pbn_file(self.session, filename)     
             
+        # Cycle through par results
+        for bar in self.bar_objects:
+            if bar.hover:
+                bar.par_cycle += 1
+         
             
         
     def on_key_press(self, key, _modifiers):

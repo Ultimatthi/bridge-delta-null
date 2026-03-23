@@ -87,6 +87,11 @@ def create_session(n):
     board with the largest absolute score is regenerated and the search
     continues.
     """
+    
+    # No balancing with just 1 board
+    if n == 1:
+        board = create_board(1)
+        return [board]
 
     indices        = list(range(1, n + 1))
     missing_idx    = random.choice(indices)

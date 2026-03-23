@@ -19,7 +19,7 @@ CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 
 # Notwenidge Spielerzahl
-FULL_TABLE = 1
+FULL_TABLE = 4
 
 # Player positions
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
@@ -290,6 +290,12 @@ class GameServer:
         if len(self.client_list) < FULL_TABLE:
             return
         
+        # Check if maximum number of games is reached
+        if self.current_game == self.total_games:
+            if self.game_phase != "finished":
+                self.game_phase = "finished"
+                self.broadcast()
+        
         # Start respective game logic
         
         if self.game_phase == "dealing":
@@ -429,12 +435,25 @@ class GameServer:
         # Update scoring baord
         self.score += score.get("total") * (1 if self.contract_team == "northsouth" else -1)
         
+        # Update session
+        delta_tricks = int(tricks_made - self.contract_level - 6)
+        self.session[self.current_game].contract = (
+            f"{self.contract_level}"
+            f"{self.get_suit_symbol(self.contract_suit)}"
+            f"{self.declarer_position[0].upper()}"
+            f"{doubled.lower() if doubled else ''}"
+            f"{'=' if delta_tricks == 0 else delta_tricks}"
+        )
+        
         # Broadcast state
         self.broadcast()
         time.sleep(1.0)
     
         # Advance game
-        self.game_phase = "resetting"
+        if self.current_game+1 == self.total_games:
+            self.game_phase = "finished"
+        else:
+            self.game_phase = "resetting"
         
         
         
@@ -454,18 +473,21 @@ class GameServer:
             player.bid_suit = None
             player.bid_level = None
             player.bid_type = None # pass, double, normal
+              
+        # Increase current game by 1
+        self.current_game += 1
             
-        # Broadcast state
-        self.broadcast()
-            
-        # Advance game
-        self.game_phase = "dealing"
-        
         # Rotate dealer
         self.current_turn = self.session[self.current_game].dealer
         
         # Rotate vulnerability
         self.vulnerability = self.session[self.current_game].vul
+        
+        # Advance game
+        self.game_phase = "dealing"
+        
+        # Broadcast state
+        self.broadcast()
                 
                 
 
@@ -901,9 +923,6 @@ class GameServer:
             card.location = "hand"
             card.owner = deal_dict[(card.suit, card.value)]
             
-        # Increate current game by 1
-        self.current_game += 1
-        
         # Advance game
         self.game_phase = "bidding"
             
@@ -930,8 +949,23 @@ class GameServer:
                 for card in cards:
                     deal_dict[(suit, card)] = pos
 
-        return deal_dict           
-            
+        return deal_dict         
+    
+    
+    def get_suit_symbol(self, suit):
+        
+        # Dictionary
+        dictionary = {
+            "clubs": "♣",
+            "diamonds": "♦", 
+            "hearts": "♥",
+            "spades": "♠",
+            "notrump": "NT",
+            None: ""
+        }
+        
+        symbol = dictionary[suit]
+        return(symbol)
      
     
     def broadcast(self):
@@ -957,7 +991,8 @@ class GameServer:
                 "total_games": self.total_games,
                 "vulnerability": self.vulnerability,
                 "dummy_position": self.dummy_position,
-                "declarer_position": self.declarer_position
+                "declarer_position": self.declarer_position,
+                "session": self.session
             }
             
             # Add card information with appropriate visibility

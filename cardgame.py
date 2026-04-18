@@ -117,7 +117,7 @@ class Card(arcade.Sprite):
     def face_up(self):
         """ Turn card face-up """
         self.texture = arcade.load_texture(self.image)
-
+        
 
 
 class Tile(arcade.Sprite):
@@ -1315,12 +1315,51 @@ class Game(arcade.View):
     def color_cards(self):
         """Color cards"""
         
-        # Highlight trump cards
+        # Check if game is init
+        if None in (self.current_turn, self.team):
+            return
+        
+        # Get cards on table
+        table = [card for card in self.card_list if card.location == "table"]
+            
+        # Color cards
         for card in self.card_list:
+            
+            # Check if card is trump
             if card.suit == self.contract_suit and card.facing == "up":
-                card.color = arcade.color.ANTIQUE_WHITE
+                is_trump = True
             else:
-                card.color = arcade.color.WHITE
+                is_trump = False
+                
+            # Check if actvie player can follow suit
+            hand = [c for c in self.card_list if c.owner == self.current_turn and c.location == "hand"]
+            must_follows_suit = len(table) > 0 and any(c.suit == table[0].suit for c in hand)
+                
+            # Dim every face up card
+            if card.facing == "up":
+                is_dimmed = True
+            else:
+                is_dimmed = False
+                
+            # Highlight cards on table
+            if card.location == "table":
+                is_dimmed = False
+                
+            # Highlight playable cards
+            if self.current_turn == card.owner and card.location == "hand":
+                if self.current_turn in self.team and len(table) < 4:
+                    if must_follows_suit and card.suit != table[0].suit:
+                        pass # stays dimmed
+                    else:
+                        is_dimmed = False
+      
+            # Set color
+            if is_dimmed:
+                card.color = (166, 160, 133) if is_trump else (166, 166, 166) 
+            else:
+                card.color = (255, 246, 204)  if is_trump else (255, 255, 255)
+        
+                
                 
     def draw_card_overlay(self):
         

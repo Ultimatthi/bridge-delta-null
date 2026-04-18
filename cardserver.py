@@ -19,7 +19,7 @@ CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 
 # Notwenidge Spielerzahl
-FULL_TABLE = 4
+FULL_TABLE = 1
 
 # Player positions
 PLAYER_POSITIONS = ["north", "east", "south", "west"]

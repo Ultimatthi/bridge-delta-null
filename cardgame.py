@@ -1528,7 +1528,7 @@ class Game(arcade.View):
         # Scoring: Points
         x = self.board_scoring.right - 55*self.layout.scale
         y = self.board_scoring.bottom + 175*self.layout.scale
-        value = self.score
+        value = self.score * (1 if self.team == "northsouth" else -1)
         text = self.annotate_state_text(value, 15, x, y, 0, 22*self.layout.scale)
         text.draw()
         

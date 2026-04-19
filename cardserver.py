@@ -374,12 +374,17 @@ class GameServer:
         # Save opener of turn
         if len(table) == 0:
             self.original_turn = self.current_turn
+            
+        # Check if bot should act
+        is_human_player = any(client.position == self.current_turn for client in self.client_list)
+        is_human_declarer = any(client.position == self.declarer_position for client in self.client_list)
+        is_dummy = self.dummy_position == self.current_turn
+        bot_should_act = not is_human_player and not (is_human_declarer and is_dummy)
         
         if len(table) < 4:
-                    
-            # Let computer play if no player in that position
-            is_human_player = any(client.position == self.current_turn for client in self.client_list)
-            if not is_human_player:
+            
+            # Let bot play if no player in that position
+            if bot_should_act:
                 self.opponent_play()
                 self.broadcast()
         
@@ -388,9 +393,8 @@ class GameServer:
             # Allocate trick
             self.allocate_trick()
             
-            # Let computer take trick if no player in that position
-            is_human_player = any(client.position == self.current_turn for client in self.client_list)
-            if not is_human_player:
+            # Let bot take trick if no player in that position
+            if bot_should_act:
                 self.take_trick(self.current_turn)
                 time.sleep(IDLE_TIME_TRICK)
                 self.broadcast()
@@ -541,13 +545,14 @@ class GameServer:
     def play_card(self, action, player_position):
         """Move cards from table to trick stack"""
         
-        # Check if it's bidding phase
+        # Check if it's playing phase
         if self.game_phase != "playing":
             return
         
-        # Check if it's this player's turn
+        # Only allow play if it's the player's turn, or if the player is declarer and dummy is on turn
         if player_position != self.current_turn:
-            return
+            if not (player_position == self.declarer_position and self.current_turn == self.dummy_position):
+                return
         
         # Get cards on table
         table = [
@@ -559,7 +564,7 @@ class GameServer:
         hand = [
             card for card in self.card_list 
             if card.location == "hand"
-            and card.owner == player_position
+            and card.owner == self.current_turn
         ]
         
         # Check if last trick was taken
@@ -586,7 +591,7 @@ class GameServer:
         card = self.find_card(card_suit, card_value)
         
         # Check if card is in hand
-        if card.location != "hand" or card.owner != player_position:
+        if card.location != "hand" or card.owner != self.current_turn:
             return
             
         # Move card to table (owner stays to track who played)

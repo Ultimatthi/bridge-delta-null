@@ -833,10 +833,16 @@ class Game(arcade.View):
         # Set cursor type to default
         cursor_type = self.window.CURSOR_DEFAULT
                 
-        # Set cursor type to "hand" if hovering card above hand card
-        if len(cards) > 0:
+        # Set cursor type to "hand" if hovering above hand card
+        if len(cards) > 0 and self.current_turn == self.player_position:
             if cards[-1].location == "hand" and cards[-1].owner == self.player_position:
                 cursor_type = self.window.CURSOR_HAND
+                
+        # Set cursor type to "hand" if hovering above dummy card (from same team)
+        if len(cards) > 0 and self.current_turn == self.dummy_position:
+            if cards[-1].location == "hand" and cards[-1].owner == self.dummy_position:
+                if self.player_position == self.declarer_position:
+                    cursor_type = self.window.CURSOR_HAND
                 
         # Check if it is player's turn (or player's dummy) to take a trick
         player_turn = True

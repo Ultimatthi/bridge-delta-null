@@ -638,6 +638,9 @@ class Game(arcade.View):
             # Draw bidding elements
             if self.game_phase == "bidding":
                 
+                # Color bidding grid
+                self.color_grid()
+                
                 # Draw bidding elements
                 self.bidding_elements.draw()
                 
@@ -825,7 +828,7 @@ class Game(arcade.View):
         tiles = arcade.get_sprites_at_point((x, y), self.tile_list)
         
         # Declare top tile as hovered tile
-        if len(tiles) > 0:
+        if len(tiles) > 0 and self.current_turn == self.player_position:
             self.hover_tile = tiles[-1]
         else:
             self.hover_tile = None
@@ -1364,8 +1367,22 @@ class Game(arcade.View):
                 card.color = (166, 160, 133) if is_trump else (166, 166, 166) 
             else:
                 card.color = (255, 246, 204)  if is_trump else (255, 255, 255)
-        
                 
+                
+        
+    def color_grid(self):
+        """Color bidding grid"""
+        
+        # Check if it's player's turn
+        if self.current_turn == self.player_position:
+            transparency = 255
+        else:
+            transparency = 128
+            
+        # Set transparency of bidding grid
+        self.bidding_grid.alpha = transparency
+            
+        
                 
     def draw_card_overlay(self):
         

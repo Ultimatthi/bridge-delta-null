@@ -13,6 +13,7 @@ import threading
 import time
 import warnings
 from datetime import datetime
+import math
 
 # Third-party
 import numpy as np
@@ -313,6 +314,10 @@ class Game(arcade.View):
         # Hovered card
         self.hover_card = None
         
+        # Pre-mmoved card
+        self.premoved_card = None
+        self.premoved_dummy_card = None
+        
         # Hovered tile
         self.hover_tile = None
         
@@ -584,6 +589,12 @@ class Game(arcade.View):
             else:
                 card.face_up()
                 
+        # Adjust pre-moved card
+        if self.current_turn == self.player_position:
+            self.premoved_card = None
+        if self.current_turn == self.dummy_position:
+            self.premoved_dummy_card = None
+                
         # Reset highlighted tile
         for tile in self.tile_list:
             if tile != self.hover_tile:
@@ -714,10 +725,26 @@ class Game(arcade.View):
             if held_card.location == "tricks":
                 self.review_trick(held_card)
                 
+            # Premove card
+            if held_card.location == "hand":
+                
+                if held_card.owner == self.player_position:
+                    if held_card == self.premoved_card:
+                        self.premoved_card = None
+                    else:
+                        self.premoved_card = held_card
+                    
+                if held_card.owner == self.dummy_position and self.declarer_position == self.player_position:
+                    if held_card == self.premoved_dummy_card:
+                        self.premoved_dummy_card = None
+                    else:
+                        self.premoved_dummy_card = held_card
+                        
+                
         # Get list of tiles we've clicked on
         tiles = arcade.get_sprites_at_point((x, y), self.tile_list)
         
-        # Have we clicked on a card?
+        # Have we clicked on a tile?
         if len(tiles) > 0:
             
             # Might be a stack of cards, get the top one
@@ -921,7 +948,8 @@ class Game(arcade.View):
         action = {
             "type": "play_card",
             "card_suit": card.suit,
-            "card_value": card.value
+            "card_value": card.value,
+            "card_owner": card.owner
         }
         
         # Send action to server
@@ -1135,6 +1163,16 @@ class Game(arcade.View):
                     card.facing = "down"
                 else:
                     card.facing = "up"
+                    
+                # Adjust premoved card
+                if card == self.premoved_card and self.game_phase == "playing":
+                    premove_offset = 40 * self.layout.scale
+                    rad = math.radians(card.angle)
+                    new_x = x + premove_offset * math.sin(rad)
+                    new_y = y + premove_offset * math.cos(rad)
+                    card.position = (new_x, new_y)
+
+    
             
     def arrange_table_cards(self):
         """Order cards on table"""
@@ -1318,6 +1356,12 @@ class Game(arcade.View):
                 card.position = x, y
                 card.angle = 0
                 card.facing = "up"
+                
+                # Adjust premoved card
+                if card == self.premoved_dummy_card and self.game_phase == "playing":
+                    premove_offset = 20 * self.layout.scale
+                    card.position = (x - premove_offset, y)
+                    card.angle = -10
                 
                 
                 
@@ -2459,7 +2503,7 @@ class GameOverView(arcade.View):
 
 def main():
     """ Main function """
-    window = arcade.Window(LOBBY_WIDTH, LOBBY_HEIGHT, LOBBY_TITLE, resizable=True, antialiasing=True)
+    window = arcade.Window(LOBBY_WIDTH, LOBBY_HEIGHT, LOBBY_TITLE, resizable=True, antialiasing=True, vsync=True)
     menu_view = MenuView()  # Start with menu view
     window.show_view(menu_view)
     arcade.run()

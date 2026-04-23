@@ -138,6 +138,9 @@ class GameServer:
         # Bidding history
         self.bidding_history = []
         
+        # Pre-moves
+        self.pre_moves = {} # {player_position: action_data}
+        
 
 
     def start_server(self):
@@ -275,7 +278,7 @@ class GameServer:
         self.broadcast_timer += delta_time
         
         # Send heartbeat to all clients
-        if self.broadcast_timer > 5.0:
+        if self.broadcast_timer > 2.0:
             # Reset timer
             self.broadcast_timer = 0.0
             # Set sound to silent
@@ -305,6 +308,7 @@ class GameServer:
             self.bidding_logic()
             
         if self.game_phase == "playing":
+            self.play_premove()
             self.playing_logic()
             
         if self.game_phase == "scoring":
@@ -511,7 +515,7 @@ class GameServer:
                     # Process client action
                     action = pickle.loads(data)
                     self.process_action(action, player_position)
-                
+
                     # Sende updated game state to all clients
                     self.broadcast()
                     
@@ -539,9 +543,27 @@ class GameServer:
             
         if action_type == "lock_bid":
             self.lock_bid(action, player_position)
-
-
-
+            
+            
+            
+    def play_premove(self):
+        
+        # Get cards on table
+        table = [
+            card for card in self.card_list 
+            if card.location == "table"
+        ]
+        
+        # Play pre-move (if available)
+        action = self.pre_moves.get(self.current_turn)
+        if action and len(table) < 4:
+            self.current_sound = None
+            self.play_card(action, self.current_turn)
+            self.pre_moves.pop(self.current_turn, None)
+            self.broadcast()
+            
+            
+            
     def play_card(self, action, player_position):
         """Move cards from table to trick stack"""
         
@@ -549,10 +571,29 @@ class GameServer:
         if self.game_phase != "playing":
             return
         
-        # Only allow play if it's the player's turn, or if the player is declarer and dummy is on turn
-        if player_position != self.current_turn:
-            if not (player_position == self.declarer_position and self.current_turn == self.dummy_position):
-                return
+        # Check if player can pre-move this card
+        card_owner = action.get("card_owner")
+        can_pre_move = (player_position == card_owner) or \
+                       (player_position == self.declarer_position and card_owner == self.dummy_position)
+                                    
+        # Store pre-move
+        existing_pre_move = self.pre_moves.get(card_owner)
+        if can_pre_move:
+            if existing_pre_move == action:
+                self.pre_moves.pop(card_owner, None)
+            else:
+                self.pre_moves[card_owner] = action
+        
+        # Determine actual playing side
+        if (player_position == self.declarer_position and
+            self.current_turn == self.dummy_position):
+            acting_position = self.dummy_position
+        else:
+            acting_position = player_position
+        
+        # Only allow play if it's the correct turn
+        if acting_position != self.current_turn:
+            return
         
         # Get cards on table
         table = [
@@ -618,6 +659,8 @@ class GameServer:
         else:
             self.allocate_trick()
             
+    
+            
     def take_trick(self, player_position):
         """Move cards from table to trick stack"""
         
@@ -629,7 +672,7 @@ class GameServer:
         if self.current_turn != player_position:
             if not (self.current_turn == self.dummy_position and player_position == self.declarer_position):
                 return
-                
+            
         # Get cards on table
         table = [card for card in self.card_list if card.location == "table"]
         
@@ -648,7 +691,7 @@ class GameServer:
                 
         # Set sound
         self.current_sound = 'take_trick'
-        
+
         
 
     def lock_bid(self, action, player_position):
@@ -657,7 +700,7 @@ class GameServer:
         # Check game phase
         if self.game_phase != "bidding":
             return
-        
+
         # Check if it's this player's turn
         if player_position != self.current_turn:
             return

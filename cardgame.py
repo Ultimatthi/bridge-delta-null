@@ -1053,6 +1053,12 @@ class Game(arcade.View):
             player.bid_level = server_player["bid_level"]
             player.bid_type = server_player["bid_type"]
             
+        # Adjust position (if necessary after joining)
+        for player in self.player_list:
+            if player.name == self.player_name:
+                self.player_position = player.position
+                self.team = self.allocate_team(self.player_position)
+            
         # Get logical card variables
         logical_card_list = game_state.get("cards")
         

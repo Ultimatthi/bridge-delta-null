@@ -144,6 +144,9 @@ class GameServer:
         # Number of player's ready for next round
         self.players_ready = {"north": 0, "east": 0, "south": 0, "west": 0}
         
+        # Thread lock (to avoid race conditions)
+        self.lock = threading.Lock()
+        
 
 
     def start_server(self):
@@ -195,21 +198,23 @@ class GameServer:
                     player_name = player_data.get("player_name")
                     print(f"Connection accepted from {addr} with username {player_name}")
                     
-                    # Dodge position if already taken
-                    player_position = self.assign_player_position(player_position)
+                    with self.lock:
                     
-                    # Decline if table is full
-                    if player_position is None:
-                        continue
-                    
-                    # Add to client list
-                    client = Client(c, player_name, player_position)
-                    self.client_list.append(client)
-                    
-                    # Remove from bot list
-                    for bot in self.bot_list:
-                        if bot.position == client.position:
-                            self.bot_list.remove(bot)
+                        # Dodge position if already taken
+                        player_position = self.assign_player_position(player_position)
+                        
+                        # Decline if table is full
+                        if player_position is None:
+                            continue
+                        
+                        # Add to client list
+                        client = Client(c, player_name, player_position)
+                        self.client_list.append(client)
+                        
+                        # Remove from bot list
+                        for bot in self.bot_list:
+                            if bot.position == client.position:
+                                self.bot_list.remove(bot)
                     
                     # Set sound to none
                     self.current_sound = None

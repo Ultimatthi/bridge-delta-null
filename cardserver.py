@@ -19,7 +19,7 @@ CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 
 # Notwenidge Spielerzahl
-FULL_TABLE = 1
+FULL_TABLE = 2
 
 # Player positions
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
@@ -112,7 +112,7 @@ class Bid:
 class GameServer:
     
     def __init__(self):
-        self.game_phase = "dealing"
+        self.game_phase = "setup"
         self.broadcast_timer = 0.0
         self.client_list = []
         self.bot_list = []
@@ -140,6 +140,9 @@ class GameServer:
         
         # Pre-moves
         self.pre_moves = {} # {player_position: action_data}
+        
+        # Number of player's ready for next round
+        self.players_ready = {"north": 0, "east": 0, "south": 0, "west": 0}
         
 
 
@@ -192,18 +195,12 @@ class GameServer:
                     player_name = player_data.get("player_name")
                     print(f"Connection accepted from {addr} with username {player_name}")
                     
-                    print(player_position)
-                    
                     # Dodge position if already taken
                     player_position = self.assign_player_position(player_position)
-                    
-                    print(player_position)
                     
                     # Decline if table is full
                     if player_position is None:
                         continue
-                    
-                    print(player_position)
                     
                     # Add to client list
                     client = Client(c, player_name, player_position)
@@ -293,6 +290,11 @@ class GameServer:
         if len(self.client_list) < FULL_TABLE:
             return
         
+        # Start game
+        if self.game_phase == "setup":
+            self.game_phase = "dealing"
+            self.broadcast()
+        
         # Check if maximum number of games is reached
         if self.current_game == self.total_games:
             if self.game_phase != "finished":
@@ -313,6 +315,9 @@ class GameServer:
             
         if self.game_phase == "scoring":
             self.scoring_logic()
+            
+        if self.game_phase == "reviewing":
+            self.review_logic()
             
         if self.game_phase == "resetting":
             self.resetting_logic()
@@ -417,8 +422,6 @@ class GameServer:
         # Count tricks of contract team
         tricks_made = sum(1 for card in self.card_list if card.trick == self.contract_team)/4
         
-        print(tricks_made)
-        
         # Was declearer vulnerable?
         if self.vulnerability in ["both", self.contract_team]:
             declarer_vulnerable = True
@@ -455,14 +458,33 @@ class GameServer:
         
         # Broadcast state
         self.broadcast()
-        time.sleep(1.0)
     
+        # Advance game
+        self.game_phase = "reviewing"
+            
+           
+            
+    def review_logic(self):
+        
+        # Move all cards back to players' hands
+        if any(card.location == "tricks" for card in self.card_list):
+            
+            for card in self.card_list:
+                card.location = "hand"
+                card.facing = "up"
+            
+            self.broadcast()
+        
+        # Check if all players are ready for next round
+        if sum(self.players_ready.values()) != FULL_TABLE:
+            return
+        
         # Advance game
         if self.current_game+1 == self.total_games:
             self.game_phase = "finished"
         else:
             self.game_phase = "resetting"
-        
+            
         
         
     def resetting_logic(self):
@@ -475,6 +497,7 @@ class GameServer:
         self.bidding_history = []
         self.dummy_position = None
         self.declarer_position = None
+        self.players_ready = {"north": 0, "east": 0, "south": 0, "west": 0}
         
         # Reset bids
         for player in self.client_list + self.bot_list:
@@ -536,6 +559,10 @@ class GameServer:
         # Take trick
         if action_type == "take_trick":
             self.take_trick(player_position)
+            
+        # Advance game
+        if action_type == "finish_review":
+            self.finish_review(player_position)
             
         # Remove player
         if action_type == "leave_game":
@@ -691,7 +718,14 @@ class GameServer:
                 
         # Set sound
         self.current_sound = 'take_trick'
+        
+        
 
+    def finish_review(self, player_position):
+        """Mark player as ready/unready for next round"""
+        
+        self.players_ready[player_position] = 1 - self.players_ready.get(player_position, 0)
+        
         
 
     def lock_bid(self, action, player_position):
@@ -1040,6 +1074,7 @@ class GameServer:
                 "vulnerability": self.vulnerability,
                 "dummy_position": self.dummy_position,
                 "declarer_position": self.declarer_position,
+                "players_ready": self.players_ready,
                 "session": self.session
             }
             

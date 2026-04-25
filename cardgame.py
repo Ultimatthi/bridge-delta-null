@@ -243,7 +243,7 @@ class Game(arcade.View):
         """ Set up the game here. Call this function to restart the game. """
         
         # Set game phase
-        self.game_phase = "bidding"
+        self.game_phase = "setup"
         
         # Visibility of last trick
         self.last_trick_visible = False
@@ -318,6 +318,9 @@ class Game(arcade.View):
         self.premoved_card = None
         self.premoved_dummy_card = None
         
+        # Number of player's ready for next round
+        self.players_ready = {"north": 0, "east": 0, "south": 0, "west": 0}
+        
         # Hovered tile
         self.hover_tile = None
         
@@ -328,14 +331,14 @@ class Game(arcade.View):
         for card_suit in CARD_SUITS:
             for card_value in CARD_VALUES:
                 card = Card(card_suit, card_value, "up", None, None, self.layout.scale)
-                card.angle = random.uniform(-5, 5)
+                card.position = (-10000, -10000)
                 self.card_list.append(card)
                 
         # Create every normal tile
         for i, tile_suit in enumerate(TILE_SUITS):
             for j, tile_level in enumerate(TILE_LEVELS):
                 tile = Tile(tile_suit, tile_level, "normal", self.layout.scale, i, j)
-                card.position = self.layout.width/2, self.layout.height/2
+                tile.position = (-10000, -10000)
                 self.tile_list.append(tile)
                 
         # Create pass tile
@@ -664,8 +667,8 @@ class Game(arcade.View):
             # Annotations
             self.annotate()
             
-            
         self.light_layer.draw()
+
         
 
     def review_trick(self, held_card):
@@ -900,6 +903,18 @@ class Game(arcade.View):
     def on_key_press(self, key, _modifiers):
         """ Handle keypresses. """
         
+        # Finish game round review
+        if key == arcade.key.SPACE and self.game_phase == "reviewing":
+            
+            # Set action
+            action = {"type": "finish_review"}
+            
+            # Send action to server
+            try:
+                self.socket.sendall(pickle.dumps(action))
+            except Exception as e:
+                print(f"Error sending to server: {e}")
+        
         # Set modifier
         if key == arcade.key.LCTRL:
             self.ctrl_held = True
@@ -1013,6 +1028,7 @@ class Game(arcade.View):
         self.vulnerability = game_state.get("vulnerability")
         self.dummy_position = game_state.get("dummy_position")
         self.declarer_position = game_state.get("declarer_position")
+        self.players_ready = game_state.get("players_ready")
         self.session = game_state.get("session")
         
         # Play sound
@@ -1110,6 +1126,11 @@ class Game(arcade.View):
         
     def arrange_player_cards(self):
         """Order cards in player's hand"""
+        
+        if self.game_phase == "reviewing":
+            review_offset = 100 * self.layout.scale
+        else:
+            review_offset = 0
 
         for position in ("south", "north", "west", "east"):
             # Get cards of that hand
@@ -1142,24 +1163,24 @@ class Game(arcade.View):
                     y = self.layout.card_height / 2 - abs(t) ** 2 * 2.25 * self.layout.scale
                     angle = t / max_cards * 60  
                 elif rel_position == "top":
-                    x = self.layout.width/2 + t * 40 * self.layout.scale
-                    y = self.layout.height - self.layout.card_height/8 + abs(t) ** 2 * 3 * self.layout.scale
-                    angle = -t / max_cards * 80
+                    x = self.layout.width/2 - t * 40 * self.layout.scale
+                    y = self.layout.height - self.layout.card_height/8 + abs(t) ** 2 * 3 * self.layout.scale - review_offset
+                    angle = 180 + t / max_cards * 80
                 elif rel_position == "left":
-                    x = self.layout.card_height/8 - abs(t) ** 2 * 3 * self.layout.scale
-                    y = self.layout.height/2 + t * 40 * self.layout.scale
-                    angle = (-t / max_cards * 80) - 90
+                    x = self.layout.card_height/8 - abs(t) ** 2 * 3 * self.layout.scale + review_offset
+                    y = self.layout.height/2 - t * 40 * self.layout.scale
+                    angle = 90 + t / max_cards * 80
                 elif rel_position == "right":
-                    x = self.layout.width - self.layout.card_height/8 + abs(t) ** 2 * 3 * self.layout.scale
+                    x = self.layout.width - self.layout.card_height/8 + abs(t) ** 2 * 3 * self.layout.scale - review_offset
                     y = self.layout.height/2 + t * 40 * self.layout.scale
                     angle = (t / max_cards * 80) + 90
-    
+
                 # Set position and angle
                 card.position = (x, y)
                 card.angle = angle
                 
-                # Set facing and size
-                if self.player_position != card.owner:
+                # Set facing
+                if self.player_position != card.owner and self.game_phase != "reviewing":
                     card.facing = "down"
                 else:
                     card.facing = "up"
@@ -1474,6 +1495,36 @@ class Game(arcade.View):
             text = self.annotate_text(label, x, y, 0, 18)
             text.draw()
             
+        # Welcome text
+        if self.game_phase == "setup":
+            label = "Waiting for players to join."
+            x = self.window.width/2
+            y = self.window.height/2
+            text = self.annotate_text(label, x, y, 0, 18)
+            text.draw()
+            
+        # Review text
+        if self.game_phase == "reviewing":
+            
+            if self.players_ready[self.player_position] == 0:
+                label = "Press SPACE to move on."
+                
+            else:
+                not_ready = [p for p in self.players_ready if self.players_ready[p] != 1]
+                label = f'Waiting for {", ".join(str(p) for p in not_ready)} to finish review'
+                
+            x = self.window.width/2
+            y = self.window.height/2
+            text = self.annotate_text(label, x, y, 0, 18)
+            text.draw()
+            
+        # Review adjustments
+        if self.game_phase == "reviewing":
+            offset_review = 100 * self.layout.scale
+        else:
+            offset_review = 0
+                
+
         # Number of cards in hands
         hand_cards = sum(1 for card in self.card_list if card.location == "hand")
         
@@ -1499,23 +1550,23 @@ class Game(arcade.View):
                 a = 0
                 dodge = [0, 1]
             elif rel_position == 'left':
-                x = 30 * self.layout.scale if is_outside else self.layout.card_height / 4 * 3
+                x = 30 * self.layout.scale if is_outside else self.layout.card_height / 4 * 3 + offset_review
                 y = self.layout.height / 2
                 a = -90
                 dodge = [1, 0]
             elif rel_position == 'top':
                 x = self.layout.width / 2
-                y = self.layout.height - 30 * self.layout.scale if is_outside else self.layout.height - self.layout.card_height / 4 * 3
+                y = self.layout.height - 30 * self.layout.scale if is_outside else self.layout.height - self.layout.card_height / 4 * 3 + offset_review
                 a = 0
                 dodge = [0, -1]
             else:  # 'right'
-                x = self.layout.width - 30 * self.layout.scale if is_outside else self.layout.width - self.layout.card_height / 4 * 3
+                x = self.layout.width - 30 * self.layout.scale if is_outside else self.layout.width - self.layout.card_height / 4 * 3 - offset_review
                 y = self.layout.height / 2
                 a = 90
                 dodge = [-1, 0]
                 
             # Add turn indication marks
-            if player.position == self.current_turn:
+            if player.position == self.current_turn and self.game_phase in ("bidding", "playing"):
                 label = "▸"  + player.name.upper() + "◂"
             else:
                 label = player.name.upper()

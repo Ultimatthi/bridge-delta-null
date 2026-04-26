@@ -165,7 +165,7 @@ class GameServer:
         
         # Create boards
         self.session = logic.dealing.create_session(self.total_games)
-        logic.dealing.write_pbn_file(self.session, 'test.txt')
+        # logic.dealing.write_pbn_file(self.session, 'test.txt')
         
         s.bind((host, port))
         s.listen(5)
@@ -450,6 +450,7 @@ class GameServer:
         
         # Update scoring baord
         self.score += score.get("total") * (1 if self.contract_team == "northsouth" else -1)
+        self.session[self.current_game].score = score.get("total")
         
         # Update session
         delta_tricks = int(tricks_made - self.contract_level - 6)

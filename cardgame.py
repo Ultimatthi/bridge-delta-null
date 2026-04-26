@@ -622,7 +622,7 @@ class Game(arcade.View):
         if self.game_phase == "finished":
             
             # Switch to GameOverView
-            gameover_view = GameOverView(self.session)
+            gameover_view = GameOverView(self.session, self.team)
             self.window.set_caption(GAMEOVERVIEW_TITLE)
             self.window.show_view(gameover_view)
         
@@ -1564,7 +1564,7 @@ class Game(arcade.View):
                 dodge = [1, 0]
             elif rel_position == 'top':
                 x = self.layout.width / 2
-                y = self.layout.height - 30 * self.layout.scale if is_outside else self.layout.height - self.layout.card_height / 4 * 3 + offset_review
+                y = self.layout.height - 30 * self.layout.scale if is_outside else self.layout.height - self.layout.card_height / 4 * 3 - offset_review
                 a = 0
                 dodge = [0, -1]
             else:  # 'right'
@@ -1865,7 +1865,7 @@ class MenuView(arcade.View):
         
     
     def on_resize(self, width, height):
-        
+
         # De-maximize window
         hwnd = self.window._hwnd
         if ctypes.windll.user32.IsZoomed(hwnd):
@@ -2320,14 +2320,23 @@ class WaterfallBar():
             
 
 class GameOverView(arcade.View):
-    def __init__(self, session):
+    def __init__(self, session, team):
         super().__init__()
         
         # Session
         self.session = session
         
-        # Load background
-        self.background = arcade.load_texture("assets/images/gameover.background.png")
+        # Team
+        self.team = team
+        
+        # Background color
+        self.background_color = MAIN_COLOR
+        
+        # Texture
+        self.board_texture = arcade.load_texture("assets/images/board.texture.png")
+        
+        # Light source
+        self.create_light()
         
         # Set modifier
         self.ctrl_held = False
@@ -2370,7 +2379,14 @@ class GameOverView(arcade.View):
         self.on_resize(self.window.width, self.window.height)
         
         # Result
-        self.result = "DEFEAT"
+        scores = [board.score for board in self.session]
+        final_score = sum(scores) * (1 if self.team == "northsouth" else -1)
+        if final_score > 0:
+            self.result = "VICTORY"
+        elif final_score < 0:
+            self.result = "DEFEAT"
+        else:
+           self.result = "DRAW" 
         
     def create_waterfall_chart(self, window_width, window_height):
         """Establishes a waterfall score chart"""
@@ -2384,7 +2400,8 @@ class GameOverView(arcade.View):
         x_start, y_start = padding_x, padding_y
         
         # Session data
-        scores = [board.par_score for board in self.session]
+        sign = 1 if self.team == "northsouth" else -1
+        scores = [(board.score - board.par_score)*sign for board in self.session]
         contracts = [board.contract for board in self.session]
         par_contracts = [board.par_contract for board in self.session]
         
@@ -2423,6 +2440,27 @@ class GameOverView(arcade.View):
             bar = WaterfallBar(bar_x, bar_y, bar_width, bar_height, fill_color, scores[i], cumulative[i], contracts[i], par_contracts[i], i, zero_y, gap, resize)
             self.bar_objects.append(bar)
             
+            
+    
+    def create_light(self):
+        
+        # Layer to handle light sources
+        self.light_layer = LightLayer(self.window.width, self.window.height)
+        
+        # Set background of light layer
+        self.light_layer.set_background_color(self.background_color)
+        
+        # Create main light source
+        self.center_light = Light(self.window.width / 2, self.window.height / 2,
+                             radius=self.window.width*0.8,
+                             color=[200, 200, 200, 255],
+                             mode='soft')
+        
+        # Add light sources to light layer
+        self.light_layer.add(self.center_light)
+        
+        
+            
     def on_update(self, delta_time):
         
         # Check if bar is hovered
@@ -2438,12 +2476,18 @@ class GameOverView(arcade.View):
                 
 
     def on_draw(self):
+        
         self.clear()
         
-        # Draw background
-        rect = arcade.LBWH(left=0, bottom=0, width=self.window.width, height=self.window.height)
-        arcade.draw_texture_rect(texture=self.background,rect=rect)
+        with self.light_layer:
+            pass
         
+        self.light_layer.draw()
+        
+        # Draw texture
+        rect = arcade.LBWH(left=0, bottom=0, width=self.window.width, height=self.window.height)
+        arcade.draw_texture_rect(texture=self.board_texture,rect=rect)
+         
         # Draw bars
         for bar in self.bar_objects:
             bar.draw()
@@ -2515,6 +2559,9 @@ class GameOverView(arcade.View):
         
         # Rescale
         self.scale = min(width / 1920, height / 1080)
+        
+        # Re-create light source
+        self.create_light()
 
         # Re-create waterfall chart
         self.bar_objects = list()

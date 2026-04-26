@@ -242,6 +242,18 @@ class Game(arcade.View):
     def setup(self):
         """ Set up the game here. Call this function to restart the game. """
         
+        # Check connection ----------------------------------------------------
+        
+        # Connect to socket
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect((self.host, self.port))
+        except:
+            print('No connection possible')
+            return False
+        
+        # Init game -----------------------------------------------------------
+        
         # Set game phase
         self.game_phase = "setup"
         
@@ -355,7 +367,6 @@ class Game(arcade.View):
             player = Player(name, position)
             self.player_list.append(player)
 
-        
         # Create board elements: Border 
         image_path = r'assets/images/board.border.png'
         self.board_border = BoardElement(image_path, self.layout.scale)
@@ -425,18 +436,7 @@ class Game(arcade.View):
         # Layout elements
         self.layout_elements()
         
-        # Connect to socket
-        try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.host, self.port))
-        except:
-            print('No connection possible')
-            menu_view = MenuView()
-            self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
-            self.window.set_caption(LOBBY_TITLE)
-            self.window.show_view(menu_view)
-            time.sleep(0.5)
-            return
+        # Start network -------------------------------------------------------
         
         # Send player data to server
         data = {
@@ -448,6 +448,8 @@ class Game(arcade.View):
         # Start thread to receive messages
         self.recv_thread = threading.Thread(target=self.receive_state, daemon=True)
         self.recv_thread.start()
+        
+        return True
         
         
     def layout_elements(self):
@@ -2084,22 +2086,23 @@ class MenuView(arcade.View):
             if selected_position == "random":
                 selected_position = random.choice(PLAYER_POSITIONS)
                 
-            # Reset window boundaries
-            self.window.set_minimum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
-            self.window.set_maximum_size(3840, 2160)
-                
             # Create main view with the user inputs
-            self.window.set_size(1600, 900)
             main_view = Game(
                 username=self.username_widget.text,
                 server=self.server_widget.text,
                 position=selected_position
             )
-            main_view.setup()
             
-            # Enter main view
-            self.window.set_caption("Bridge: Client")
-            self.window.show_view(main_view)
+            if main_view.setup():    
+                # Reset window boundaries
+                self.window.set_minimum_size(LOBBY_WIDTH, LOBBY_HEIGHT)
+                self.window.set_maximum_size(3840, 2160)
+                # self.window.set_size(1600, 900)
+                self.window.set_caption("Bridge: Client")
+                # Enter game
+                self.window.show_view(main_view)
+            else:
+                print("Cannot start game")
     
         # Toggle button events - only one can be selected at a time
         for toggle in self.toggle_list:

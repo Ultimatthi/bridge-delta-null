@@ -1860,6 +1860,7 @@ class MenuView(arcade.View):
         self.create_ui_elements()
         self.position_ui_elements()
         self.setup_event_handlers()
+        
     
     def on_resize(self, width, height):
         
@@ -1871,8 +1872,18 @@ class MenuView(arcade.View):
 
     def load_assets(self):
         """Load all required assets."""
+        
         # Background image
         self.background = arcade.load_texture("assets/images/lobby.background.png")
+        
+        # Background color
+        self.background_color = MAIN_COLOR
+        
+        # Texture
+        self.board_texture = arcade.load_texture("assets/images/board.texture.png")
+        
+        # Light source
+        self.create_light()
         
         # Load sound effects
         self.sound_drop = arcade.load_sound("assets/effects/drop.mp3")
@@ -1895,6 +1906,23 @@ class MenuView(arcade.View):
             "join_off": arcade.load_texture("assets/images/button.join.off.png"),
             "join_on": arcade.load_texture("assets/images/button.join.on.png")
         }
+        
+    def create_light(self):
+        
+        # Layer to handle light sources
+        self.light_layer = LightLayer(LOBBY_WIDTH, LOBBY_HEIGHT)
+        
+        # Set background of light layer
+        self.light_layer.set_background_color(self.background_color)
+        
+        # Create main light source
+        self.center_light = Light(LOBBY_WIDTH / 2, LOBBY_HEIGHT / 2,
+                             radius=LOBBY_WIDTH*0.6,
+                             color=[200, 200, 200, 255],
+                             mode='soft')
+        
+        # Add light sources to light layer
+        self.light_layer.add(self.center_light)
 
     def setup_ui_styles(self):
         """Set up UI widget styles."""
@@ -1926,7 +1954,7 @@ class MenuView(arcade.View):
         self.username_widget = arcade.gui.UIInputText(
             text=username,
             height=35 * LOBBY_SCALE, 
-            width=(370 - 2 * 12) * LOBBY_SCALE,
+            width=(500 - 2 * 12) * LOBBY_SCALE,
             font_name="Courier New",
             font_size=15,
             border_width=0,
@@ -1938,7 +1966,7 @@ class MenuView(arcade.View):
         self.server_widget = arcade.gui.UIInputText(
             text=server,
             height=35 * LOBBY_SCALE, 
-            width=(370 - 2 * 12) * LOBBY_SCALE,
+            width=(500 - 2 * 12) * LOBBY_SCALE,
             font_name="Courier New",
             font_size=15,
             border_width=0,
@@ -1993,22 +2021,22 @@ class MenuView(arcade.View):
         # Position username input
         self.anchor.add(
             child=self.username_widget,
-            anchor_x="left", align_x=(280 + 12) * LOBBY_SCALE,
-            anchor_y="bottom", align_y=(795 + 12) * LOBBY_SCALE
+            anchor_x="left", align_x=(710 + 12) * LOBBY_SCALE,
+            anchor_y="bottom", align_y=(640 + 12) * LOBBY_SCALE
         )
         
         # Position server input
         self.anchor.add(
             child=self.server_widget,
-            anchor_x="left", align_x=(280 + 12) * LOBBY_SCALE,
-            anchor_y="bottom", align_y=(635 + 12) * LOBBY_SCALE
+            anchor_x="left", align_x=(710 + 12) * LOBBY_SCALE,
+            anchor_y="bottom", align_y=(480 + 12) * LOBBY_SCALE
         )
         
         # Position launch button
         self.anchor.add(
             child=self.launch_widget,
-            anchor_x="left", align_x=279 * LOBBY_SCALE,
-            anchor_y="bottom", align_y=198 * LOBBY_SCALE
+            anchor_x="left", align_x=775 * LOBBY_SCALE,
+            anchor_y="bottom", align_y=138 * LOBBY_SCALE
         )
         
         # Position toggle buttons
@@ -2017,18 +2045,18 @@ class MenuView(arcade.View):
     def position_toggle_buttons(self):
         """Position the toggle buttons."""
         positions = [
-            (self.north_widget, 280),
-            (self.east_widget, 357.5),
-            (self.south_widget, 435),
-            (self.west_widget, 512.5),
-            (self.random_widget, 590)
+            (self.north_widget, 775.0),
+            (self.east_widget, 852.5),
+            (self.south_widget, 930.0),
+            (self.west_widget, 1007.5),
+            (self.random_widget, 1085.0)
         ]
         
         for widget, x_pos in positions:
             self.anchor.add(
                 child=widget,
                 anchor_x="left", align_x=x_pos * LOBBY_SCALE,
-                anchor_y="bottom", align_y=465 * LOBBY_SCALE
+                anchor_y="bottom", align_y=320 * LOBBY_SCALE
             )
 
     def setup_event_handlers(self):
@@ -2104,15 +2132,26 @@ class MenuView(arcade.View):
 
     def on_draw(self):
         """Render the screen."""
+        
+        # Clear the screen
         self.clear()
+        
+        with self.light_layer:
+            pass
+        
+        self.light_layer.draw()
         
         # Draw background
         rect = arcade.LBWH(left=0, bottom=0, width=self.window.width, height=self.window.height)
         arcade.draw_texture_rect(texture=self.background,rect=rect)
         
+        # Draw texture
+        rect = arcade.LBWH(left=0, bottom=0, width=self.window.width, height=self.window.height)
+        arcade.draw_texture_rect(texture=self.board_texture,rect=rect)
+        
         # Draw UI elements
         self.manager.draw()
-
+        
     def on_key_press(self, key, modifiers):
         """Handle key presses, especially for clipboard operations."""
         # Handle Ctrl+V (paste)

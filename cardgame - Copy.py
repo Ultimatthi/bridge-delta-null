@@ -623,7 +623,7 @@ class Game(arcade.View):
         if self.game_phase == "finished":
             
             # Switch to GameOverView
-            gameover_view = GameOverView(self.session, self.team, self.player_list)
+            gameover_view = GameOverView(self.session, self.team)
             self.window.set_caption(GAMEOVERVIEW_TITLE)
             self.window.show_view(gameover_view)
         
@@ -2264,7 +2264,7 @@ class WaterfallBar():
         # Resize bar
         width, height = self.width*f, self.height*f
 
-        # Define rectangle
+        # Define recangle
         bar_rect = arcade.XYWH(x=self.x,y=self.y,width=width,height=abs(height))
             
         # Draw bar
@@ -2321,7 +2321,7 @@ class WaterfallBar():
             
 
 class GameOverView(arcade.View):
-    def __init__(self, session, team, player_list):
+    def __init__(self, session, team):
         super().__init__()
         
         # Session
@@ -2330,14 +2330,8 @@ class GameOverView(arcade.View):
         # Team
         self.team = team
         
-        # Players
-        self.player_list = player_list
-        
         # Background color
         self.background_color = MAIN_COLOR
-        
-        # Display mode
-        self.display_mode = 1
         
         # Texture
         self.board_texture = arcade.load_texture("assets/images/board.texture.png")
@@ -2398,9 +2392,6 @@ class GameOverView(arcade.View):
     def create_waterfall_chart(self, window_width, window_height):
         """Establishes a waterfall score chart"""
         
-        # Reset existing chart
-        self.bar_objects = []
-        
         # Set layout parameters
         resize = window_width / 1920, window_height / 1080
         padding_x = 150 * min(resize)
@@ -2411,12 +2402,7 @@ class GameOverView(arcade.View):
         
         # Session data
         sign = 1 if self.team == "northsouth" else -1
-        
-        if self.display_mode == 1:
-            scores = [(board.score)*sign for board in self.session]
-        else:
-            scores = [(board.score - board.par_score)*sign for board in self.session]
-        
+        scores = [(board.score - board.par_score)*sign for board in self.session]
         contracts = [board.contract for board in self.session]
         par_contracts = [board.par_contract for board in self.session]
         
@@ -2538,10 +2524,8 @@ class GameOverView(arcade.View):
         text.draw()    
             
         # Draw info text
-        t = {p.position: p.name.upper() for p in self.player_list}
-        text = f"{t['north']}-{t['south']} (NS) vs. {t['east']}-{t['west']} (EW)"
         text = arcade.Text(
-            text,
+            "GANYMED-KALLISTO (NS) vs. ISIS-OSIRIS (EW)",
             x=50*self.scale, y=self.window.height-50*self.scale,
             color=arcade.color.WHITE,
             font_size=16*self.scale, font_name="Courier New",
@@ -2562,10 +2546,7 @@ class GameOverView(arcade.View):
         text.draw()
         
         # Draw axis label
-        if self.display_mode == 1:
-            text = "CUMULATIVE SCORE"
-        else:
-            text = "CUMULATIVE DOUBLE DUMMY SCORE DELTA"
+        text = "CUMULATIVE DOUBLE DUMMY SCORE DELTA"
         arcade.draw_text(text, 100 * self.scale, self.window.height/2,
             font_size=16 * self.scale, color=arcade.color.WHITE, 
             anchor_x="center", anchor_y="center", bold=True, rotation=-90)
@@ -2663,12 +2644,6 @@ class GameOverView(arcade.View):
             self.window.set_size(LOBBY_WIDTH, LOBBY_HEIGHT)
             self.window.set_caption(LOBBY_TITLE)
             self.window.show_view(menu_view)
-            
-        # Switch display mode
-        if key == arcade.key.SPACE:
-            
-            self.display_mode = 2 if self.display_mode == 1 else 1
-            self.create_waterfall_chart(self.window.width, self.window.height)
         
         
 
@@ -2681,6 +2656,6 @@ def main():
     window.show_view(menu_view)
     arcade.run()
 
+
 if __name__ == "__main__":
     main()
-    

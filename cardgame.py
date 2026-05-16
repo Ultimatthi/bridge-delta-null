@@ -1140,6 +1140,9 @@ class Game(arcade.View):
         self.arrange_table_cards()
         self.arrange_dummy_cards()
         
+        # Order cards in hand
+        self.order_hand()
+        
     def arrange_player_cards(self):
         """Order cards in player's hand"""
         
@@ -2187,7 +2190,7 @@ class MenuView(arcade.View):
             for widget in self.input_list:
                 if widget.active:
                     widget.caret.mark = 0
-                    widget.caret.position = len(widget.text)
+                    widget.caret.position = len(widget.text)     
                     
     def save_player_data(self, name, server, position, filename="playerdata.json"):
         data = {

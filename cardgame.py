@@ -713,6 +713,9 @@ class Game(arcade.View):
 
         # Get list of cards we've clicked on
         cards = arcade.get_sprites_at_point((x, y), self.card_list)
+        
+        # Get list of cards on table
+        table = [card for card in self.card_list if card.location == "table"]
 
         # Have we clicked on a card?
         if len(cards) > 0:
@@ -722,6 +725,10 @@ class Game(arcade.View):
             
             # Play card
             if held_card.location == "hand":
+                # Attempt to take trick
+                if len(table) == 4:
+                    self.take_trick()
+                # Play card
                 self.play_card(held_card)
             
             # Take trick

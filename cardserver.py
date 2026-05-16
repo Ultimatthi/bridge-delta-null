@@ -581,16 +581,11 @@ class GameServer:
             
     def play_premove(self):
         
-        # Get cards on table
-        table = [
-            card for card in self.card_list 
-            if card.location == "table"
-        ]
-        
         # Play pre-move (if available)
         action = self.pre_moves.get(self.current_turn)
-        if action and len(table) < 4:
+        if action:
             self.current_sound = None
+            self.take_trick(self.current_turn) # Attempt
             self.play_card(action, self.current_turn)
             self.pre_moves.pop(self.current_turn, None)
             self.broadcast()

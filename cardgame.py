@@ -2439,7 +2439,7 @@ class GameOverView(arcade.View):
         num_hands = len(scores)
         bar_width = width / (num_hands) * 0.6
         max_span = abs(max(cumulative)) + abs(min(cumulative))
-        scale = (height) / max_span
+        scale = (height / max_span) if max_span else 1
         
         # Zero axis
         zero_y = y_start + abs(min(cumulative)) * scale

@@ -369,7 +369,11 @@ class GameServer:
         
         # # Iterate new game round
         if no_bid_round:
-            self.game_phase = "resetting"
+            self.session[self.current_game].score = 0
+            if self.current_game+1 == self.total_games:
+                self.game_phase = "finished"
+            else:
+                self.game_phase = "resetting"
             return
         
         # Let computer bid if no player in that position
@@ -953,7 +957,7 @@ class GameServer:
                       if bot.position == self.current_turn)
         
         # Randomly choose if bot passes or bids
-        choice = random.choice(["pass", "bid"])
+        choice = random.choice(["bid", "pass"])
 
         # Bot bids
         if choice == "bid":

@@ -1,0 +1,13 @@
+[Board "1"]
+[Dealer "N"]
+[Vulnerable "None"]
+[Deal "N:9854.A2.J92.AQ53 AK3.JT3.AQ63.KJ2 Q76.Q765.K84.864 JT2.K984.T75.T97"]
+[OptimumScore "NS -120"]
+[ParContract "1NTE+1;1NTW+1"]
+
+[Board "2"]
+[Dealer "E"]
+[Vulnerable "NS"]
+[Deal "N:AT52.5.KT765.KT2 Q964.KQJ4.982.Q5 873.AT62.A43.874 KJ.9873.QJ.AJ963"]
+[OptimumScore "NS 120"]
+[ParContract "2NTN=;2NTS="]

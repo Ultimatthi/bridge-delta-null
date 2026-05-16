@@ -510,6 +510,9 @@ class GameServer:
             player.bid_suit = None
             player.bid_level = None
             player.bid_type = None # pass, double, normal
+            
+        # Reset pre-moves
+        self.pre_moves = {}
               
         # Increase current game by 1
         self.current_game += 1
@@ -601,9 +604,12 @@ class GameServer:
         
         # Check if player can pre-move this card
         card_owner = action.get("card_owner")
-        can_pre_move = (player_position == card_owner) or \
-                       (player_position == self.declarer_position and card_owner == self.dummy_position)
-                                    
+        if card_owner == self.current_turn:
+            can_pre_move = False
+        else:
+            can_pre_move = (player_position == card_owner) or \
+                           (player_position == self.declarer_position and card_owner == self.dummy_position)
+                                        
         # Store pre-move
         existing_pre_move = self.pre_moves.get(card_owner)
         if can_pre_move:

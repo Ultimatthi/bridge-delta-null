@@ -90,7 +90,7 @@ class Layout:
 class Card(arcade.Sprite):
     """ Card sprite """
 
-    def __init__(self, suit, value, facing, owner, location, trick, scale=1):
+    def __init__(self, suit, value, facing, owner, location, trick, trick_number, scale=1):
         """ Card constructor """
 
         # Attributes
@@ -100,6 +100,7 @@ class Card(arcade.Sprite):
         self.owner = owner
         self.location = location # deck, table, hand, dummy, tricks
         self.trick = trick
+        self.trick_number = trick_number
         self.hcp = HCP.get(value, 0)
 
         # Image to use for the sprite when face up
@@ -165,6 +166,19 @@ class Bid:
         self.type = bid_type
         self.level = level
         self.suit = suit
+        
+        
+        
+class Play:
+    
+    def __init__(self, player, card_suit, card_value, trick_number, trick_winner, original_turn):
+        
+        self.player = player
+        self.card_suit = card_suit
+        self.card_value = card_value
+        self.trick_number = trick_number
+        self.trick_winner = trick_winner
+        self.original_turn =  original_turn
         
         
         
@@ -257,6 +271,7 @@ class Game(arcade.View):
         
         # Set game phase
         self.game_phase = "setup"
+        self.previous_game_phase = None
         
         # Visibility of last trick
         self.last_trick_visible = False
@@ -267,12 +282,18 @@ class Game(arcade.View):
         # Set bidding history
         self.bidding_history = []
         
+        # Set playing history
+        self.playing_history = []
+        
         # Mouse position
         self.mouse_x = 0
         self.mouse_y = 0
         
         # Set modifier
         self.ctrl_held = False
+        
+        # Set review counter
+        self.review_count = 0
         
         # Allocate team
         self.team = self.allocate_team(self.player_position)
@@ -299,6 +320,9 @@ class Game(arcade.View):
         
         # Board element list with all the bidding elements
         self.bidding_elements = arcade.SpriteList()
+        
+        # Board element list with all the bidding strips
+        self.bidding_strips = arcade.SpriteList()
         
         # Board element list with all the texture elements
         self.texture_elements = arcade.SpriteList()
@@ -343,7 +367,7 @@ class Game(arcade.View):
         # Create every card
         for card_suit in CARD_SUITS:
             for card_value in CARD_VALUES:
-                card = Card(card_suit, card_value, "up", None, None, self.layout.scale)
+                card = Card(card_suit, card_value, "up", None, None, None, self.layout.scale)
                 card.position = (-10000, -10000)
                 self.card_list.append(card)
                 
@@ -407,21 +431,25 @@ class Game(arcade.View):
         image_path = r'assets/images/bidding.strip.bottom.png'
         self.bidding_strip_bottom = BoardElement(image_path, self.layout.scale)
         self.bidding_elements.append(self.bidding_strip_bottom)
+        self.bidding_strips.append(self.bidding_strip_bottom)
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.top.png'
         self.bidding_strip_top = BoardElement(image_path, self.layout.scale)
         self.bidding_elements.append(self.bidding_strip_top)
+        self.bidding_strips.append(self.bidding_strip_top)
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.left.png'
         self.bidding_strip_left = BoardElement(image_path, self.layout.scale)
         self.bidding_elements.append(self.bidding_strip_left)
+        self.bidding_strips.append(self.bidding_strip_left)
         
         # Create bidding elements: Strips
         image_path = r'assets/images/bidding.strip.right.png'
         self.bidding_strip_right = BoardElement(image_path, self.layout.scale)
         self.bidding_elements.append(self.bidding_strip_right)
+        self.bidding_strips.append(self.bidding_strip_right)
         
         # Create bidding elements: HCP pad
         image_path = r'assets/images/hcp.overlay.png'
@@ -454,6 +482,11 @@ class Game(arcade.View):
         
         
     def layout_elements(self):
+        
+            if self.game_phase == "reviewing":
+                review_offset = 100 * self.layout.scale
+            else:
+                review_offset = 0
             
             # Tiles
             for tile in self.tile_list:
@@ -509,18 +542,18 @@ class Game(arcade.View):
             # Bidding elements: Strips (Top)
             self.bidding_strip_top.scale = self.layout.scale
             x = self.layout.width / 2
-            y = self.layout.height / 2 + 320 * self.layout.scale
+            y = self.layout.height / 2 + 320 * self.layout.scale - review_offset
             self.bidding_strip_top.position = x, y
             
             # Bidding elements: Strips (Left)
             self.bidding_strip_left.scale = self.layout.scale
-            x = 240 * self.layout.scale
+            x = 240 * self.layout.scale + review_offset
             y = self.layout.height / 2
             self.bidding_strip_left.position = x, y
             
             # Bidding elements: Strips (Right)
             self.bidding_strip_right.scale = self.layout.scale
-            x = self.layout.width - 240 * self.layout.scale
+            x = self.layout.width - 240 * self.layout.scale - review_offset
             y = self.layout.height / 2 + 10 * self.layout.scale
             self.bidding_strip_right.position = x, y
             
@@ -666,6 +699,11 @@ class Game(arcade.View):
                 
                 # Annotations
                 self.annotate_bidding()
+            
+            # Draw bidding strips during review:
+            if self.game_phase == "reviewing" and self.review_count == 0:
+                self.bidding_strips.draw()
+                self.annotate_bidding()
                 
             # Annotations
             self.annotate()
@@ -764,9 +802,21 @@ class Game(arcade.View):
             held_tile = tiles[-1]
             
             self.make_bid(held_tile)
-
             
-                
+        # Adjust review counter
+        if self.game_phase == "reviewing":
+            if button == arcade.MOUSE_BUTTON_LEFT:
+                self.review_count = min(self.review_count + 1, 14)
+            elif button == arcade.MOUSE_BUTTON_RIGHT:
+                self.review_count = max(self.review_count - 1, 0)
+            elif button == arcade.MOUSE_BUTTON_MIDDLE:
+                self.review_count = 0
+            self.relocate_cards_in_review_phase()
+            self.layout_elements()
+            self.adjust_card_position()
+        
+    
+    
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
         """ Called when the user scrolls the mouse wheel. """
                 
@@ -1002,7 +1052,42 @@ class Game(arcade.View):
     def order_hand(self):
         """Order cards in hand by suit and value"""
         
-        self.card_list.sort(key=lambda card: (CARD_SUITS.index(card.suit), CARD_VALUES.index(card.value)))
+        # Find order
+        hand_cards = [card for card in self.card_list if card.location == "hand"]
+        hand_cards.sort(key=lambda card: (CARD_SUITS.index(card.suit), CARD_VALUES.index(card.value)))
+        
+        # Order cards
+        for card in hand_cards:
+            self.card_list.remove(card)
+            self.card_list.append(card)
+        
+        
+        
+    def relocate_cards_in_review_phase(self):
+        
+        if self.game_phase != "reviewing":
+            return
+        
+        # Update location 
+        for card in self.card_list:
+            if card.trick_number < self.review_count:
+                card.location = "tricks"
+                card.facing = "down"
+            if card.trick_number == self.review_count:
+                card.location = "table"
+                card.facing = "up"
+            if card.trick_number > self.review_count:
+                card.location = "hand"
+                card.facing = "up"
+                
+        # Update card order on table
+        for play in self.playing_history:
+            if play.trick_number != self.review_count:
+                pass
+            else:
+                self.original_turn = play.original_turn
+                self.current_turn = play.trick_winner
+                                                    
 
 
     def receive_state(self):
@@ -1026,11 +1111,19 @@ class Game(arcade.View):
         
         # Update game state variables
         self.game_phase = game_state.get("game_phase")
+        self.players_ready = game_state.get("players_ready")
+        
+        if self.game_phase == "reviewing" and self.previous_game_phase == "reviewing" and self.current_game is not None:
+            return
+        
+        self.previous_game_phase = self.game_phase
+        
+        # Update game state variables
         self.current_turn = game_state.get("current_turn")
-        self.original_turn = game_state.get("original_turn")
         self.contract_suit = game_state.get("contract_suit")
         self.contract_level = game_state.get("contract_level")
         self.contract_doubled = game_state.get("contract_doubled")
+        self.original_turn = game_state.get("original_turn")
         self.contract_team = game_state.get("contract_team")
         self.score = game_state.get("score")
         self.current_game = game_state.get("current_game")
@@ -1038,7 +1131,6 @@ class Game(arcade.View):
         self.vulnerability = game_state.get("vulnerability")
         self.dummy_position = game_state.get("dummy_position")
         self.declarer_position = game_state.get("declarer_position")
-        self.players_ready = game_state.get("players_ready")
         self.session = game_state.get("session")
         
         # Play sound
@@ -1082,11 +1174,15 @@ class Game(arcade.View):
                 card = card_map[key]
                 card.facing = logical_card["facing"]
                 card.owner = logical_card["owner"]
-                card.location = logical_card["location"]
                 card.trick = logical_card["trick"]
+                card.trick_number = logical_card["trick_number"]
+                card.location = logical_card["location"]
 
         # Update card position
         self.adjust_card_position()
+        
+        # Refresh layout
+        self.layout_elements()
         
         # Reorder cards after new draw
         hand_count = sum(1 for card in self.card_list if card.location == "hand")
@@ -1105,6 +1201,21 @@ class Game(arcade.View):
                 suit=bid_info["suit"]
             )
             self.bidding_history.append(bid)
+            
+        # Clear playing history
+        self.playing_history.clear()
+        
+        # Add playing history
+        for play_info in game_state["playing_history"]:
+            play = Play(
+                player=play_info["player"],
+                card_suit=play_info["card_suit"],
+                card_value=play_info["card_value"],
+                trick_number=play_info["trick_number"],
+                trick_winner=play_info["trick_winner"],
+                original_turn=play_info["original_turn"]
+            )
+            self.playing_history.append(play)
             
             
 
@@ -1126,6 +1237,9 @@ class Game(arcade.View):
     def adjust_card_position(self):
         """Position the card based on location"""
         
+        # Sort cards
+        self.sort_cards()
+        
         # Order cards and delete bidding after every game
         if self.game_phase == "resetting":
             self.sort_cards()
@@ -1142,6 +1256,8 @@ class Game(arcade.View):
         
         # Order cards in hand
         self.order_hand()
+        
+        
         
     def arrange_player_cards(self):
         """Order cards in player's hand"""
@@ -1211,8 +1327,8 @@ class Game(arcade.View):
                     new_x = x + premove_offset * math.sin(rad)
                     new_y = y + premove_offset * math.cos(rad)
                     card.position = (new_x, new_y)
+                
 
-    
             
     def arrange_table_cards(self):
         """Order cards on table"""
@@ -1246,18 +1362,13 @@ class Game(arcade.View):
                 pass
                 
         # Order cards on table [vertically]
-        current_index = PLAYER_POSITIONS.index(self.original_turn)  # <== statt self.current_turn
-        # Sort by player position (clockwise from original turn)
-        sorted_positions = PLAYER_POSITIONS[current_index:] + PLAYER_POSITIONS[:current_index]
-        # Build sort order dict
-        sort_order = {pos: i for i, pos in enumerate(sorted_positions)}
-        # Sort cards on table accordingly
-        table.sort(key=lambda card: sort_order.get(card.owner, 999))
-        # Update drawing order
+        start = PLAYER_POSITIONS.index(self.original_turn)
+        clockwise_from_start = PLAYER_POSITIONS[start:] + PLAYER_POSITIONS[:start]
+        table.sort(key=lambda card: clockwise_from_start.index(card.owner))
         for card in table:
             self.card_list.remove(card)
             self.card_list.append(card)
-            
+                    
 
             
     def arrange_stack_cards(self):
@@ -1365,8 +1476,8 @@ class Game(arcade.View):
         # Get cards in hand
         hand_cards = [card for card in self.card_list if card.location == "hand"]
         
-        # Check if game phase is playing
-        if self.game_phase != "playing":
+        # Check if game phase is playing or reviewing
+        if self.game_phase not in ("playing", "reviewing"):
             return
         
         # Check if first card is already played
@@ -1402,7 +1513,7 @@ class Game(arcade.View):
                     premove_offset = 20 * self.layout.scale
                     card.position = (x - premove_offset, y)
                     card.angle = -10
-                
+                    
                 
                 
     def color_cards(self):
@@ -1445,6 +1556,10 @@ class Game(arcade.View):
                         pass # stays dimmed
                     else:
                         is_dimmed = False
+                        
+            # Highlight all cards during review
+            if self.game_phase == "reviewing":
+                is_dimmed = False
       
             # Set color
             if is_dimmed:
@@ -1525,8 +1640,11 @@ class Game(arcade.View):
         # Review text
         if self.game_phase == "reviewing":
             
-            if self.players_ready[self.player_position] == 0:
-                label = "Press SPACE to move on."
+            if self.review_count > 0 and self.review_count < 14:
+                label = ""
+            
+            elif self.players_ready[self.player_position] == 0:
+                label = "Press SPACE to move on – or left/right mouse button to review play."
                 
             else:
                 not_ready = [p for p in self.players_ready if self.players_ready[p] != 1]

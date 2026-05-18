@@ -49,6 +49,7 @@ class ServerCard:
         self.location = "deck"  # deck, table, hand, dummy, tricks
         self.owner = None
         self.trick = None
+        self.trick_number = None
         
         
         
@@ -106,6 +107,19 @@ class Bid:
         }
         team = team_by_player[position]
         return(team)
+    
+    
+    
+class Play:
+    
+    def __init__(self, player, card_suit, card_value, trick_number, trick_winner, original_turn):
+        
+        self.player = player
+        self.card_suit = card_suit
+        self.card_value = card_value
+        self.trick_number = trick_number
+        self.trick_winner = trick_winner
+        self.original_turn =  original_turn
 
 
 
@@ -125,6 +139,7 @@ class GameServer:
         self.contract_team = None
         self.score = 0 # Positive: Northsouth, negative: Eastwest
         self.current_game = 0
+        self.current_trick = 0
         self.vulnerability = "none" # none, both, northsouth, eastwest
         self.dummy_position = None
         self.declarer_position = None
@@ -137,6 +152,9 @@ class GameServer:
         
         # Bidding history
         self.bidding_history = []
+        
+        # Playing history
+        self.playing_history = []
         
         # Pre-moves
         self.pre_moves = {} # {player_position: action_data}
@@ -452,9 +470,9 @@ class GameServer:
                     tricks_made = tricks_made
                 )
         
-        # Update scoring baord
+        # Update scoring baord (pov: northsouth)
         self.score += score.get("total") * (1 if self.contract_team == "northsouth" else -1)
-        self.session[self.current_game].score = score.get("total")
+        self.session[self.current_game].score = self.score
         
         # Update session
         delta_tricks = int(tricks_made - self.contract_level - 6)
@@ -505,6 +523,7 @@ class GameServer:
         self.contract_doubled = "no"
         self.contract_team = None
         self.bidding_history = []
+        self.playing_history = []
         self.dummy_position = None
         self.declarer_position = None
         self.players_ready = {"north": 0, "east": 0, "south": 0, "west": 0}
@@ -520,6 +539,9 @@ class GameServer:
               
         # Increase current game by 1
         self.current_game += 1
+        
+        # Set trick count to 0
+        self.current_trick = 0
             
         # Rotate dealer
         self.current_turn = self.session[self.current_game].dealer
@@ -685,6 +707,14 @@ class GameServer:
         
         print(f"Player {player_position} played {card_value} of {card_suit}")
         
+        # Find current trick number
+        tricks = [card for card in self.card_list if card.location == "tricks"]
+        trick_number = int(len(tricks) / 4) + 1
+        
+        # Update playing history
+        play = Play(card.owner, card.suit, card.value, trick_number, None, self.original_turn)
+        self.playing_history.append(play)
+        
         # Get cards on table
         table = [
             card for card in self.card_list 
@@ -717,15 +747,28 @@ class GameServer:
         # Check if 4 cards on table
         if len(table) != 4:
             return
+        
+        # Find current trick number
+        tricks = [card for card in self.card_list if card.location == "tricks"]
+        trick_number = int(len(tricks) / 4) + 1
                 
         # Move cards to trick stack
         for card in table:
             card.facing = "down"
             card.location = "tricks"
+            card.trick_number = trick_number
             if self.current_turn in ["north", "south"]:
                 card.trick = "northsouth"
             else:
                 card.trick = "eastwest"
+                
+        # Increment trick count
+        self.current_trick += 1
+                
+        # Mark winner
+        for play in self.playing_history:
+            if play.trick_number == self.current_trick:
+                play.trick_winner = self.current_turn
                 
         # Set sound
         self.current_sound = 'take_trick'
@@ -934,6 +977,14 @@ class GameServer:
         # Set sound
         self.current_sound = 'play_card'
         
+        # Find current trick number
+        tricks = [card for card in self.card_list if card.location == "tricks"]
+        trick_number = int(len(tricks) / 4) + 1
+        
+        # Update playing history
+        play = Play(selected_card.owner, selected_card.suit, selected_card.value, trick_number, None, self.original_turn)
+        self.playing_history.append(play)
+        
         # Get cards on table
         table = [
             card for card in self.card_list 
@@ -1071,6 +1122,7 @@ class GameServer:
                 "cards": [],
                 "players": [],
                 "bidding_history": [],
+                "playing_history": [],
                 "game_phase": self.game_phase,
                 "current_turn": self.current_turn,
                 "original_turn": self.original_turn,
@@ -1097,7 +1149,8 @@ class GameServer:
                     "facing": card.facing,
                     "location": card.location,
                     "owner": card.owner,
-                    "trick": card.trick
+                    "trick": card.trick,
+                    "trick_number": card.trick_number
                 }
                 game_state["cards"].append(card_info)
                 
@@ -1111,6 +1164,18 @@ class GameServer:
                     "team": bid.team
                 }
                 game_state["bidding_history"].append(bid_info)
+                
+            # Add playing history
+            for play in self.playing_history:
+                play_info = {
+                    "player": play.player,
+                    "card_suit": play.card_suit,
+                    "card_value": play.card_value,
+                    "trick_number": play.trick_number,
+                    "trick_winner": play.trick_winner,
+                    "original_turn": play.original_turn
+                }
+                game_state["playing_history"].append(play_info)
                 
             # Add player info
             for player in self.client_list + self.bot_list:

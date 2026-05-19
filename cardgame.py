@@ -1250,12 +1250,9 @@ class Game(arcade.View):
         # Order cards in different locations
         self.arrange_player_cards()
         self.arrange_stack_cards()
-        self.arrange_reviewed_trick()
-        self.arrange_table_cards()
+        self.arrange_reviewed_trick()  
         self.arrange_dummy_cards()
-        
-        # Order cards in hand
-        self.order_hand()
+        self.arrange_table_cards()
         
         
         

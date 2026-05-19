@@ -451,6 +451,12 @@ class Game(arcade.View):
         self.bidding_elements.append(self.bidding_strip_right)
         self.bidding_strips.append(self.bidding_strip_right)
         
+        # Create bidding elements: Arrow
+        image_path = r'assets/images/bidding.arrow.png'
+        self.bidding_arrow = BoardElement(image_path, self.layout.scale)
+        self.bidding_elements.append(self.bidding_arrow)
+        self.bidding_strips.append(self.bidding_arrow)    
+        
         # Create bidding elements: HCP pad
         image_path = r'assets/images/hcp.overlay.png'
         self.hcp_overlay = BoardElement(image_path, self.layout.scale)
@@ -1805,16 +1811,24 @@ class Game(arcade.View):
             if rel_position == "bottom":
                 x = self.bidding_strip_bottom.right - 90*self.layout.scale * (1 + strip_position)
                 y = self.bidding_strip_bottom.center_y
+                arrow_pos = [0, -1]
+                arrow_angle = 0
             elif rel_position == "top":
                 x = self.bidding_strip_top.left + 90*self.layout.scale * (1 + strip_position)
                 y = self.bidding_strip_top.center_y
+                arrow_pos = [0, 1]
+                arrow_angle = 180
             elif rel_position == "left":
                 x = self.bidding_strip_left.center_x
                 y = self.bidding_strip_left.bottom + 65*self.layout.scale * (1 + strip_position)
+                arrow_pos = [1, 0]
+                arrow_angle = 90
             elif rel_position == "right":
                 x = self.bidding_strip_right.center_x
                 y = self.bidding_strip_right.top - 65*self.layout.scale * (1 + strip_position)
-                
+                arrow_pos = [-1, 0]
+                arrow_angle = -90
+            
             # Draw bidding text
             if bid.suit == 'notrump' and len(label) > 1:
                 # Split number and "NT" into two separate text elements
@@ -1831,6 +1845,11 @@ class Game(arcade.View):
             else:
                 text = self.annotate_text(label, x, y, 0, 30, color)
                 text.draw()
+                
+            # Set arrow location (indicating starting bid)
+            if i == 0:
+                self.bidding_arrow.position = x + 95 * self.layout.scale * arrow_pos[0], y - 80 * self.layout.scale * arrow_pos[1]
+                self.bidding_arrow.angle = arrow_angle
 
             
     def convert_bid_to_symbol(self, bid):

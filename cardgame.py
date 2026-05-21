@@ -295,6 +295,9 @@ class Game(arcade.View):
         # Set review counter
         self.review_count = 0
         
+        # Set visible bidding
+        self.call_bidding_history = False
+        
         # Allocate team
         self.team = self.allocate_team(self.player_position)
         
@@ -980,6 +983,11 @@ class Game(arcade.View):
                 self.socket.sendall(pickle.dumps(action))
             except Exception as e:
                 print(f"Error sending to server: {e}")
+                
+        # Show/hide bidding during play
+        if key == arcade.key.SPACE and self.game_phase == "playing":
+            
+            self.call_bidding_history = not self.call_bidding_history
         
         # Set modifier
         if key == arcade.key.LCTRL:
@@ -2505,6 +2513,7 @@ class GameOverView(arcade.View):
         # Load sound effects
         self.sound_drop = arcade.load_sound("assets/effects/drop.mp3")
         self.sound_store = arcade.load_sound("assets/effects/store.mp3")
+        self.sound_flip = arcade.load_sound("assets/effects/flip.mp3")
         
         # Create chart
         self.create_waterfall_chart(self.window.width, self.window.height)
@@ -2522,10 +2531,15 @@ class GameOverView(arcade.View):
         self.overview_result = BoardElement(image_path, self.scale)
         self.overview_elements.append(self.overview_result)
         
-        # Create board elements: Overview result
+        # Create board elements: Overview download
         image_path = r'assets/images/overview.download.png'
         self.overview_download = BoardElement(image_path, self.scale)
         self.overview_elements.append(self.overview_download)
+        
+        # Create board elements: Overview graph flip
+        image_path = r'assets/images/overview.flip.png'
+        self.overview_flip = BoardElement(image_path, self.scale)
+        self.overview_elements.append(self.overview_flip)
         
         self.on_resize(self.window.width, self.window.height)
         
@@ -2739,10 +2753,14 @@ class GameOverView(arcade.View):
         self.overview_result.position = self.window.width/2, self.window.height - 75*self.scale
         self.overview_result.scale = self.scale
         
-        # Position overview elements: Result
+        # Position overview elements: Download
         self.overview_download.position = self.window.width - 80*self.scale, self.window.height - 75*self.scale
         self.overview_download.scale = self.scale
         
+        # Position overview elements: Download
+        self.overview_flip.position = self.window.width - 160*self.scale, self.window.height - 75*self.scale
+        self.overview_flip.scale = self.scale
+             
         
         
         
@@ -2752,17 +2770,27 @@ class GameOverView(arcade.View):
         self.mouse_x = x
         self.mouse_y = y
         
-        # Set cursor type to "hand" if hovering above download button
-        btn = self.overview_download
-        if (btn.left <= x <= btn.right and
-                btn.bottom <= y <= btn.top):
-            cursor_type = self.window.CURSOR_HAND
-            btn.scale = self.scale * 1.2
-        else:
-            cursor_type = self.window.CURSOR_DEFAULT
-            btn.scale = self.scale
-            
-        self.window.set_mouse_cursor(self.window.get_system_mouse_cursor(cursor_type))
+        buttons = [self.overview_download, self.overview_flip]
+        
+        hovered = False
+        
+        for btn in buttons:
+            is_hovered = btn.left <= x <= btn.right and btn.bottom <= y <= btn.top
+        
+            btn.scale = self.scale * 1.2 if is_hovered else self.scale
+        
+            if is_hovered:
+                hovered = True
+        
+        cursor = (
+            self.window.CURSOR_HAND
+            if hovered
+            else self.window.CURSOR_DEFAULT
+        )
+        
+        self.window.set_mouse_cursor(
+            self.window.get_system_mouse_cursor(cursor)
+        )
         
         
     def is_mouse_over_bar(self, bar_x, bar_y, bar_width, bar_height):
@@ -2784,7 +2812,20 @@ class GameOverView(arcade.View):
             # Save pbn
             filename = "saves/records/" + datetime.today().strftime('%Y-%m-%dT%H-%M') + ".pbn"
             os.makedirs(os.path.dirname(filename), exist_ok=True)
-            logic.dealing.write_pbn_file(self.session, filename)     
+            logic.dealing.write_pbn_file(self.session, filename)    
+            
+        # Flip display mode
+        btn = self.overview_flip
+        if (btn.left <= x <= btn.right and
+                btn.bottom <= y <= btn.top):
+            
+            #Play sound
+            arcade.play_sound(self.sound_flip)
+            
+            # Flip display mode
+            self.display_mode = 2 if self.display_mode == 1 else 1
+            self.create_waterfall_chart(self.window.width, self.window.height)
+        
             
         # Cycle through par results
         for bar in self.bar_objects:
@@ -2811,8 +2852,7 @@ class GameOverView(arcade.View):
         # Switch display mode
         if key == arcade.key.SPACE:
             
-            self.display_mode = 2 if self.display_mode == 1 else 1
-            self.create_waterfall_chart(self.window.width, self.window.height)
+            pass
         
         
 

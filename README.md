@@ -9,11 +9,11 @@ Although the game can be played with bots (which are very rudimentary), it is in
 
 Launcher:
 
-![launcher interface](docs/images/launcher.png)
+![launcher interface](sources/readme/launcher.png)
 
 Gameplay:
 
-![gameplay view](docs/images/gameplay.png)
+![gameplay view](sources/readme/gameplay.png)
 
 Dealer and vulnerability follow a standard rotation. Any number of deals can be played, but sessions of 16 deals are recommended so that all dealer-vulnerability combinations are represented evenly.
 16-deal session example:
@@ -33,13 +33,13 @@ This perception can be supported statistically. The figure below shows the expec
 
 Double Dummy analysis represents perfect play with complete information and does not necessarily correspond to the best play achievable by human players with limited information. However, analysis of publicly available online databases shows that it provides a good heuristic — in particular, Double Dummy results predict the average number of tricks achieved by expert players reasonably well.
 
-![scores histogram](docs/images/scores_hist.png)
+![scores histogram](sources/readme/scores_hist.png)
 
 The program therefore constrains deal sampling such that, over a game session (i.e. a predefined number of hands), the expected net score is approximately zero. The target is intentionally approximate rather than exact to avoid overly restrictive sampling. An example 16-hand session is shown below.
 
 Importantly, other bridge statistics (slam probabilities, suit distributions, etc.) remain unaffected by this constraint.
 
-![scores example](docs/images/scores_example.png)
+![scores example](sources/readme/scores_example.png)
 
 ## Project Structure
 

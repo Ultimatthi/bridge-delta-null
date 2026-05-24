@@ -60,6 +60,7 @@ bridge/
 - Python library: Arcade ≥ 3.1
 - Python library: NumPy ≥ 2.2
 - Python library: Pyperclip ≥ 1.9
+- Python library: Endplay ≥ 0.5.12
 
 ### Installation
 
@@ -77,6 +78,7 @@ Open terminal (Linux/macOS) or command prompt (Windows) in the directory where y
    pip install arcade
    pip install numpy
    pip install pyperclip
+   pip install endplay
    ```
 
 ### Network Setup

@@ -1,0 +1,7 @@
+*.pyc
+*.swp
+dist/android/bin
+dist/android/gen
+dist/gae/scripts/*.js
+sayc-env
+src/z3b_actual.txt

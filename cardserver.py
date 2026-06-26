@@ -9,7 +9,7 @@ import time
 import random
 import logic.scoring
 import logic.dealing
-
+import logic.bot_bidding
 
 
 # ──[ Parameter ]──────────────────────────────────────────────────────────────
@@ -1006,36 +1006,34 @@ class GameServer:
         # Select client
         bot = next(bot for bot in self.bot_list 
                       if bot.position == self.current_turn)
-        
-        # Randomly choose if bot passes or bids
-        choice = random.choice(["bid", "pass"])
 
-        # Bot bids
-        if choice == "bid":
-            if self.contract_level is None:
-                bot.bid_suit = "clubs"
-                bot.bid_level = 1
-                bot.bid_type = "normal"
-            elif self.contract_level < 4:
-                index = (SUITS.index(self.contract_suit) + 1) % 5
-                bot.bid_level = self.contract_level + (index==0)
-                bot.bid_suit = SUITS[index]
-                bot.bid_type = "normal"
-            else:
-                choice = "pass"
-            
-        # Bot passes
-        if choice == "pass":
+        # Get call from call
+        call = logic.bot_bidding.make_call(bot.position, self.card_list, self.bidding_history)
+        
+        # Set bid
+        if call == "P":
             bot.bid_suit = None
             bot.bid_level = None
             bot.bid_type = "pass"
+        elif call == "X":
+            bot.bid_suit = None
+            bot.bid_level = None
+            bot.bid_type = "double"
+        else:
+            bot.bid_suit = [suit for suit in SUITS if suit.startswith(call[1].lower())][0]
+            bot.bid_level = int(call[0])
+            bot.bid_type = "normal"
             
         # Set game contract
-        if choice == "bid":
+        if call not in ("P", "X"):
             self.contract_level = bot.bid_level
             self.contract_suit = bot.bid_suit
             self.contract_team = bot.team
             self.contract_doubled = "no"
+            
+        # Set doubled contract
+        if call == "X":
+           self.contract_doubled = "yes" 
             
         # Update bidding history
         bid = Bid(bot.position, bot.bid_type, bot.bid_level, bot.bid_suit)

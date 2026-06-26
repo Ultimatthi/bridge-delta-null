@@ -19,32 +19,32 @@ echo ===================================================
 
 :: [1/4] Download embedded Python from python.org
 echo [1/4] Downloading Python...
-powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%PY_URL%' -OutFile 'python_embed.zip' -ErrorAction Stop"
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%PY_URL%' -OutFile 'python_embed.zip' -ErrorAction Stop" >nul 2>&1
 if !errorlevel! neq 0 ( echo ERROR: Download failed! Please check your internet connection. & pause & exit /b )
 
 :: [2/4] Extract the zip into the local python_env folder
 echo [2/4] Extracting Python...
-powershell -Command "Expand-Archive -Path 'python_embed.zip' -DestinationPath '%PY_DIR%' -Force"
-del python_embed.zip
+powershell -Command "Expand-Archive -Path 'python_embed.zip' -DestinationPath '%PY_DIR%' -Force" >nul 2>&1
+del python_embed.zip >nul 2>&1
 
 :: [3/4] Enable pip support and inject game directory into Python path
-::       Embedded Python ignores PYTHONPATH, so we patch the .pth file directly.
-::       "import site" allows third-party packages to be found.
-::       ".." adds the parent folder (game directory) so local modules like logic/ are found.
-echo [3/4] Enabling pip support and local paths...
-powershell -Command "(Get-Content '%PY_DIR%\python312._pth') -replace '#import site','import site' | Set-Content '%PY_DIR%\python312._pth'"
-powershell -Command "Add-Content '%PY_DIR%\python312._pth' '..'"
+echo [3/4] Configuring environment paths...
+powershell -Command "(Get-Content '%PY_DIR%\python312._pth') -replace '#import site','import site' | Set-Content '%PY_DIR%\python312._pth'" >nul 2>&1
+powershell -Command "Add-Content '%PY_DIR%\python312._pth' '..'" >nul 2>&1
 
-:: [4/4] Install pip, then install all required packages
-echo [4/4] Installing pip and packages...
-powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%PY_DIR%\get-pip.py' -ErrorAction Stop"
+:: [4/4] Install pip and regular game requirements
+echo [4/4] Installing package manager and game dependencies...
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile '%PY_DIR%\get-pip.py' -ErrorAction Stop" >nul 2>&1
 if !errorlevel! neq 0 ( echo ERROR: pip download failed! Please check your internet connection. & pause & exit /b )
-"%PY_EXE%" "%PY_DIR%\get-pip.py" --quiet --no-warn-script-location
-del "%PY_DIR%\get-pip.py"
+"%PY_EXE%" "%PY_DIR%\get-pip.py" --quiet --no-warn-script-location >nul 2>&1
+del "%PY_DIR%\get-pip.py" >nul 2>&1
 
-echo Installing arcade, numpy, pyperclip, endplay...
-"%PY_EXE%" -m pip install arcade numpy pyperclip endplay --quiet --no-warn-script-location
+:: Install regular game requirements
+"%PY_EXE%" -m pip install arcade numpy pyperclip endplay --quiet --no-warn-script-location >nul 2>&1
 if !errorlevel! neq 0 ( echo ERROR: Package installation failed. & pause & exit /b )
+
+echo Setup complete!
+echo.
 
 :: --- START GAME ---
 :RUN_GAME

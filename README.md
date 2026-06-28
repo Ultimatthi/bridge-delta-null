@@ -3,9 +3,9 @@
 **Delta Null** is a multiplayer bridge card game developed in Python using the Python Arcade Library.
 The game is designed as a peer-to-peer experience without a central online lobby or matchmaking system. Instead, one player hosts a session locally, while the remaining players connect directly as clients, enabling private games among friends.
 
-The key feature of the program is the generation of balanced deals through constrained sampling of hands, ensuring that the net score, as estimated by Double Dummy analysis, is biased toward averaging to zero across a session.
+The key feature of the program is the generation of balanced deals through constrained sampling, ensuring that the expected net score, as estimated by Double Dummy analysis, is close to zero over the course of a session.
 
-Although the game can be played with bots (which are very rudimentary), it is intended primarily as a PvP experience. The game follows standard bridge rules with four players using Chicago scoring system.
+Although the game can be played with bots (using SAYC bidding), it is intended primarily as a PvP experience. The game follows standard bridge rules with four players using Chicago scoring system.
 
 Launcher:
 
@@ -46,39 +46,43 @@ Importantly, other bridge statistics (slam probabilities, suit distributions, et
 ```
 bridge/
 ├── assets/          # Finalized images, sounds, and media files used directly in the game
-├── sources/         # Working files (e.g., Inkscape .svg files and other editable sources)
-├── docs/            # Documentation, concept notes, and related materials
-├── cardserver.py    # Server-side script
-└── cardclient.py    # Client-side script
+├── logic/           # Game logic and core functionality
+├── sources/         # Working files (e.g. SVG files and other editable sources)
+└── cardgame.py      # Main script (Client)
+├── cardserver.py    # Main script (Server)
+├── start_game.bat   # Launcher (Windows Client)
+└── start_server.bat # Launcher (Windows Server)
 ```
 
 ## Getting Started
 
-### Prerequisites
-
-- Python ≥ 3.10
-- Python library: Arcade ≥ 3.1
-- Python library: NumPy ≥ 2.2
-- Python library: Pyperclip ≥ 1.9
-- Python library: Endplay ≥ 0.5.12
-
-### Installation
-
 Open terminal (Linux/macOS) or command prompt (Windows) in the directory where you want to clone the project. Then:
+
+### Installation (Windows)
 
 1. Clone the repository:
    ```bash
    git clone https://github.com/Ultimatthi/bridge-delta-null
    cd bridge-delta-null
    ```
-2. Install a Python runtime environment: [https://www.python.org/](https://www.python.org/)
+2. Start either of the provided batch files:
+   - `start_server.bat`
+   - `start_game.bat`
+
+   The scripts automatically create a local Python virtual environment and install all required dependencies. Once the setup is complete, they launch the server or the game, respectively (see section "Running the Game").
+
+### Installation (Linux / macOS / manual installation):
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Ultimatthi/bridge-delta-null
+   cd bridge-delta-null
+   ```
+2. Install a Python runtime environment (version 3.10 or newer): [https://www.python.org/](https://www.python.org/)
 
 3. Install required dependencies:
    ```bash
-   pip install arcade
-   pip install numpy
-   pip install pyperclip
-   pip install endplay
+   pip install -r requirements.txt
    ```
 
 ### Network Setup
@@ -98,11 +102,26 @@ Open terminal (Linux/macOS) or command prompt (Windows) in the directory where y
    python cardgame.py
 ```
 3. Join the game session by connecting to the server at `<host-ip>:<port>`
-   - For local network: Use the host's local IP address (e.g., "192.168.1.50:55556")
    - For online play: Use the host's public IP address (e.g., "88.214.164.224:55556")
+   - For local network: Use the host's local IP address (e.g., "192.168.1.50:55556")
+   - For singleplayer (and 3 bots): Use localhost (e.g., "localhost:55556")
 
 ## License
+
 This project is licensed under the MIT License — see the LICENSE file for details.
+
+## Credits
+
+This project uses or builds upon the following open-source projects:
+
+- **Arcade** – Python game development library  
+  https://api.arcade.academy/en/stable/
+
+- **Endplay** – Bridge toolkit with Double Dummy Solver support  
+  https://github.com/dominicprice/endplay
+
+- **SAYCBridge** – Standard American Yellow Card (SAYC) bidding engine  
+  https://github.com/eseidel/saycbridge
 
 ## Contributing
 

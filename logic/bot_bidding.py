@@ -15,7 +15,7 @@ from core.callhistory import CallHistory
 from kbb import KnowledgeBasedBidder
 
 # Card constants
-CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
+VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
 SUITS = ["clubs", "diamonds", "hearts", "spades"]
 
 def make_call(position, card_list, bidding_history):
@@ -25,7 +25,7 @@ def make_call(position, card_list, bidding_history):
     
     # Create CDHS-string (e.g. "Q85.A8753.T7.K53")
     cdhs_string = ".".join(
-        "".join(sorted((card.value for card in cards if card.suit == s), key=CARD_VALUES.index, reverse=True))
+        "".join(sorted((card.value for card in cards if card.suit == s), key=VALUES.index, reverse=True))
         for s in SUITS
     )
     

@@ -10,6 +10,7 @@ import random
 import logic.scoring
 import logic.dealing
 import logic.bot_bidding
+import logic.bot_playing
 
 
 # ──[ Parameter ]──────────────────────────────────────────────────────────────
@@ -938,34 +939,15 @@ class GameServer:
     def opponent_play(self):
         """Play card for non-player opponent"""
         
-        time.sleep(IDLE_TIME_PLAY)
+        # time.sleep(IDLE_TIME_PLAY)
+
+        # Select card to play
+        card_suit, card_value = logic.bot_playing.play_card(self.card_list, self.playing_history, self.contract_suit, self.current_turn, self.dummy_position)
         
-        # Init selected card
-        selected_card = None
-        
-        # Get cards on table
-        table = [
-            card for card in self.card_list 
-            if card.location == "table"
-        ]
-            
-        # Select opponent's card
-        hand = [
-            card for card in self.card_list 
-            if card.location == "hand"
-            and card.owner == self.current_turn
-        ]
-        
-        # Select card by following suit
-        if len(table) > 0:
-            for card in hand:
-                if card.suit == table[0].suit:
-                    selected_card = card
-                    break
-        
-        # If no card of the required suit was found, use the first card in hand
-        if selected_card is None and hand:
-            selected_card = hand[0]
+        # Find card in card list
+        for card in self.card_list:
+            if card.suit == card_suit and card.value == card_value:
+                selected_card = card
         
         # Move card from hand to table
         selected_card.location = "table"

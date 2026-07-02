@@ -19,9 +19,6 @@ import logic.bot_playing
 CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]
 CARD_SUITS = ["diamonds", "clubs", "hearts", "spades"]
 
-# Notwenidge Spielerzahl
-FULL_TABLE = 1
-
 # Player positions
 PLAYER_POSITIONS = ["north", "east", "south", "west"]
 
@@ -157,6 +154,9 @@ class GameServer:
         # Playing history
         self.playing_history = []
         
+        # Number of human players
+        self.full_table = None
+        
         # Pre-moves
         self.pre_moves = {} # {player_position: action_data}
         
@@ -181,6 +181,10 @@ class GameServer:
         # Set total number of games (user input)
         total_games_input = input("Enter total number of deals for this session (press Enter for default 16): ").strip()
         self.total_games = 16 if not total_games_input else int(total_games_input)
+        
+        # Set number of human player
+        full_table_input = input("Enter number of human players (press Enter for default 4): ").strip()
+        self.full_table = 4 if not full_table_input else int(full_table_input)
         
         # Create boards
         self.session = logic.dealing.create_session(self.total_games)
@@ -311,7 +315,7 @@ class GameServer:
             self.current_sound = original_sound
         
         # Check if required number of players are on server
-        if len(self.client_list) < FULL_TABLE:
+        if len(self.client_list) < self.full_table:
             return
         
         # Start game
@@ -505,7 +509,7 @@ class GameServer:
             self.broadcast()
         
         # Check if all players are ready for next round
-        if sum(self.players_ready.values()) != FULL_TABLE:
+        if sum(self.players_ready.values()) != self.full_table:
             return
         
         # Advance game

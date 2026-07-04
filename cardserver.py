@@ -943,7 +943,8 @@ class GameServer:
     def opponent_play(self):
         """Play card for non-player opponent"""
         
-        # time.sleep(IDLE_TIME_PLAY)
+        # Start timer
+        start = time.perf_counter()
 
         # Select card to play
         card_suit, card_value = logic.bot_playing.play_card(self.card_list, self.playing_history, self.contract_suit, self.current_turn, self.dummy_position)
@@ -982,6 +983,12 @@ class GameServer:
             self.advance_turn()
         else:
             self.allocate_trick()
+            
+        # Delay bot to make it play more natural
+        end = time.perf_counter()
+        elapsed = end - start
+        delay = max(0, IDLE_TIME_PLAY - elapsed)
+        time.sleep(delay)
         
         
         

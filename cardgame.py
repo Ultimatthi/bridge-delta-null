@@ -975,6 +975,9 @@ class Game(arcade.View):
         # Finish game round review
         if key == arcade.key.SPACE and self.game_phase == "reviewing":
             
+            # Reset review count
+            self.review_count == 0
+            
             # Set action
             action = {"type": "finish_review"}
             
@@ -1251,8 +1254,9 @@ class Game(arcade.View):
     def adjust_card_position(self):
         """Position the card based on location"""
         
-        # Sort cards
-        self.sort_cards()
+        # Order cards during review
+        if self.game_phase == "reviewing":
+            self.sort_cards()
         
         # Order cards and delete bidding after every game
         if self.game_phase == "resetting":

@@ -1655,19 +1655,30 @@ class Game(arcade.View):
         # Review text
         if self.game_phase == "reviewing":
             
+            # Get score
+            board = self.session[self.current_game]
+            score = int(abs(board.score))
+            
             if self.review_count > 0 and self.review_count < 14:
+                score_label = ""
                 label = ""
             
             elif self.players_ready[self.player_position] == 0:
+                score_label = f"{self.contract_team} went {'up' if score > 0 else 'down'} {score}"
                 label = "Press SPACE to move on – or left/right mouse button to review play."
                 
             else:
                 not_ready = [p for p in self.players_ready if self.players_ready[p] != 1]
+                score_label = ""
                 label = f'Waiting for {", ".join(str(p) for p in not_ready)} to finish review'
                 
+            # Draw text
             x = self.window.width/2
             y = self.window.height/2
-            text = self.annotate_text(label, x, y, 0, 18)
+            offset = 40 * self.layout.scale
+            text = self.annotate_text(score_label, x, y + offset, 0, 20)
+            text.draw()
+            text = self.annotate_text(label, x, y - offset, 0, 20)
             text.draw()
             
         # Review adjustments

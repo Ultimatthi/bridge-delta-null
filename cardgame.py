@@ -221,6 +221,43 @@ class Player():
         }
         team = team_by_player[position]
         return(team)
+    
+    
+    
+class DustParticle(arcade.SpriteCircle):
+    """Single dust particle"""
+
+    def __init__(self, x, y):
+        
+        radius = random.uniform(4, 8)
+        gray = random.randint(150, 220)
+        color = (gray, gray, gray)
+        
+        super().__init__(radius, color)
+
+        self.center_x = x
+        self.center_y = y
+
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(20, 60)  # pixel/s
+        self.change_x = math.cos(angle) * speed
+        self.change_y = math.sin(angle) * speed
+
+        self.lifetime = 1.2 # s
+        self.age = 0.0
+
+    def update(self, delta_time):
+        
+        self.center_x += self.change_x * delta_time
+        self.center_y += self.change_y * delta_time
+
+        self.age += delta_time
+        remaining = max(0.0, 1 - self.age / self.lifetime)
+        self.alpha = int(255 * remaining)
+        self.scale = 0.4 + 0.6 * remaining
+
+        if self.age >= self.lifetime:
+            self.remove_from_sprite_lists()
 
 
 
@@ -366,6 +403,9 @@ class Game(arcade.View):
         
         # Thread
         self.running = True
+        
+        # Sprite list with all the dust particles (visual effect only)
+        self.dust_list = arcade.SpriteList()
 
         # Create every card
         for card_suit in CARD_SUITS:
@@ -661,6 +701,9 @@ class Game(arcade.View):
             if bid_ordinal <= contract_ordinal and tile.type == "normal":
                 tile.color = MAIN_COLOR
                 
+        # Update dust particles
+        self.dust_list.update(delta_time)
+                
         # End game
         if self.game_phase == "finished":
             
@@ -716,6 +759,9 @@ class Game(arcade.View):
                 
             # Annotations
             self.annotate()
+            
+            # Dust particles
+            self.dust_list.draw()
             
         self.light_layer.draw()
 
@@ -800,7 +846,12 @@ class Game(arcade.View):
                     else:
                         self.premoved_dummy_card = held_card
                         
-                
+        else:
+            
+            # Generate dust
+            for _ in range(24):
+                self.dust_list.append(DustParticle(x, y))
+                        
         # Get list of tiles we've clicked on
         tiles = arcade.get_sprites_at_point((x, y), self.tile_list)
         

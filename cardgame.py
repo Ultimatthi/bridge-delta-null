@@ -230,8 +230,9 @@ class DustParticle(arcade.SpriteCircle):
     def __init__(self, x, y):
         
         radius = random.uniform(4, 8)
-        gray = random.randint(150, 220)
-        color = (gray, gray, gray)
+
+        offset = random.randint(10, 30)
+        color = (17 + offset, 53 + offset, 65 + offset)
         
         super().__init__(radius, color)
 

@@ -285,6 +285,7 @@ class Game(arcade.View):
         self.sound_cash = arcade.load_sound(r'assets/effects/cash.mp3')
         self.sound_drop = arcade.load_sound(r'assets/effects/drop.mp3')
         self.sound_lock = arcade.load_sound(r'assets/effects/lock.mp3')
+        self.sound_knock = arcade.load_sound(r'assets/effects/knock.mp3')
         
         # Fonts
         arcade.load_font("assets/fonts/CourierNewBold.ttf")
@@ -847,14 +848,8 @@ class Game(arcade.View):
                     else:
                         self.premoved_dummy_card = held_card
                         
-        else:
-            
-            # Generate dust
-            for _ in range(24):
-                self.dust_list.append(DustParticle(x, y))
-                        
         # Get list of tiles we've clicked on
-        tiles = arcade.get_sprites_at_point((x, y), self.tile_list)
+        tiles = arcade.get_sprites_at_point((x, y), self.tile_list) if self.game_phase == "bidding" else []
         
         # Have we clicked on a tile?
         if len(tiles) > 0:
@@ -863,6 +858,15 @@ class Game(arcade.View):
             held_tile = tiles[-1]
             
             self.make_bid(held_tile)
+            
+        # Have we clicked on the empty board?
+        if len(cards) == 0 and len(tiles) == 0:
+            
+            # Generatge dust
+            for _ in range(24):
+                self.dust_list.append(DustParticle(x, y))
+            # Play sound
+            self.play_sound("knock")
             
         # Adjust review counter
         if self.game_phase == "reviewing":
@@ -1300,6 +1304,8 @@ class Game(arcade.View):
             arcade.play_sound(self.sound_drop)
         elif sound == 'lock':
             arcade.play_sound(self.sound_lock)
+        elif sound == 'knock':
+            arcade.play_sound(self.sound_knock)
             
             
         

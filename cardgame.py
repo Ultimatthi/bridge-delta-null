@@ -1713,16 +1713,17 @@ class Game(arcade.View):
         # Review text
         if self.game_phase == "reviewing":
             
-            # Get score
+            # Get score (pov: contract team)
             board = self.session[self.current_game]
-            score = int(abs(board.score))
+            score = board.score * (1 if self.contract_team == "northsouth" else -1)
+            score_abs = int(abs(board.score))
             
             if self.review_count > 0 and self.review_count < 14:
                 score_label = ""
                 label = ""
             
             elif self.players_ready[self.player_position] == 0:
-                score_label = f"{self.contract_team} went {'up' if score > 0 else 'down'} {score}"
+                score_label = f"{self.contract_team} went {'up' if score > 0 else 'down'} {score_abs}"
                 label = "Press SPACE to move on – or left/right mouse button to review play."
                 
             else:
@@ -2541,6 +2542,7 @@ class WaterfallBar():
         match = re.match(r"(\d+(?:NT|[♠♥♦♣]))([NESW])(x{1,2})?(.+)", contract)
         contract, player, double, result = match.groups()
         dbl = double if double else ""
+        result = f"+{result}" if result[0] not in "+-=" else result # add "+" before overtricks
         return f"{player}|{contract}{dbl}|{result}"
 
             

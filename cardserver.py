@@ -381,6 +381,7 @@ class GameServer:
             time.sleep(IDLE_TIME_PHASE)
             self.game_phase = "playing"
             self.current_turn = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+1) % 4]
+            # Broadcast
             self.broadcast()
             return
 
@@ -475,9 +476,12 @@ class GameServer:
                     tricks_made = tricks_made
                 )
         
+        # Adjust score from pov northsouth
+        score_ns = score.get("total") * (1 if self.contract_team == "northsouth" else -1)
+        
         # Update scoring baord (pov: northsouth)
-        self.score += score.get("total") * (1 if self.contract_team == "northsouth" else -1)
-        self.session[self.current_game].score = self.score
+        self.score += score_ns
+        self.session[self.current_game].score = score_ns
         
         # Update session
         delta_tricks = int(tricks_made - self.contract_level - 6)

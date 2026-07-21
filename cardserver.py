@@ -141,6 +141,7 @@ class GameServer:
         self.vulnerability = "none" # none, both, northsouth, eastwest
         self.dummy_position = None
         self.declarer_position = None
+        self.dummy_swapped = False
         
         # Game session with all boards
         self.session = []
@@ -175,8 +176,8 @@ class GameServer:
         host = "0.0.0.0"
         
         # Set port (user input)
-        port_input = input("Enter port (press Enter for default 55556): ").strip()
-        port = 55556 if not port_input else int(port_input)
+        port_input = input("Enter port (press Enter for default 52000): ").strip()
+        port = 52000 if not port_input else int(port_input)
         
         # Set total number of games (user input)
         total_games_input = input("Enter total number of deals for this session (press Enter for default 16): ").strip()
@@ -246,7 +247,7 @@ class GameServer:
                     self.broadcast()
                     
                     # Starte a new thread for each client
-                    client_thread = threading.Thread(target=self.handle_client, args=(c, player_position, player_name), daemon=True)
+                    client_thread = threading.Thread(target=self.handle_client, args=(c, player_name), daemon=True)
                     client_thread.start()
                 except:
                     pass
@@ -381,6 +382,8 @@ class GameServer:
             time.sleep(IDLE_TIME_PHASE)
             self.game_phase = "playing"
             self.current_turn = PLAYER_POSITIONS[(PLAYER_POSITIONS.index(declarer.position)+1) % 4]
+            # Swap declarer and dummy if necessary (if bot is declarer and human is dummy)
+            self.swap_dummy()
             # Broadcast
             self.broadcast()
             return
@@ -526,6 +529,9 @@ class GameServer:
         
     def resetting_logic(self):
         
+        # Swap back dummy (if necessary)
+        self.swap_dummy()
+        
         # Reset game state for next game
         self.contract_level = None
         self.contract_suit = None
@@ -566,7 +572,7 @@ class GameServer:
                 
                 
 
-    def handle_client(self, c, player_position, player_name):
+    def handle_client(self, c, player_name):
 
         while True:
             
@@ -578,6 +584,11 @@ class GameServer:
                     
                     # Reset sound
                     self.current_sound = None
+                    
+                    # Get player position
+                    for client in self.client_list:
+                        if client.name == player_name:
+                            player_position = client.position
                     
                     # Process client action
                     action = pickle.loads(data)
@@ -922,6 +933,27 @@ class GameServer:
         self.client_list.remove(client)
         print(f"Client {player_position} was removed from the game")
 
+
+
+    def swap_dummy(self):
+        
+        # Swap / swap back
+        if not self.dummy_swapped:
+            bot_target = self.declarer_position
+            client_target = self.dummy_position
+        else:
+            bot_target = self.dummy_position
+            client_target = self.declarer_position
+                    
+        # Find bot and client
+        bot = next((bot for bot in self.bot_list if bot.position == bot_target), None)
+        client = next((client for client in self.client_list if client.position == client_target), None)
+        
+        # Swap positions
+        if bot and client:
+            bot.position, client.position = client.position, bot.position
+            self.dummy_swapped = not self.dummy_swapped
+                        
 
 
     def find_card(self, suit, value):
